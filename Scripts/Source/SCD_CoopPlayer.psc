@@ -13,6 +13,10 @@ ReferenceAlias Property Reward Auto
 ObjectReference[] Property Towns Auto
 Location[] Property TownHolds Auto
 WorldSpace[] Property TownWorlds Auto
+; the marker that counts as discovering each town (a walled city's own, not its stables)
+ObjectReference[] Property TownFound Auto
+MiscObject Property Gold Auto
+GlobalVariable Property SurvivalOn Auto
 ; Survival Mode's carry weight ability, zeroed by our plugin
 Spell Property SurvivalCarry Auto
 
@@ -38,6 +42,7 @@ Float nextLookup
 Float partnerDownUntil
 Float wipedAt = -100.0
 Float holdStart = -1.0
+Bool travelBlocked
 Actor[] victims
 Float[] victimTimes
 Int nextVictim
@@ -105,6 +110,7 @@ EndEvent
 
 Event OnUpdate()
 	Float t = Now()
+	GuardFastTravel()
 	If downed
 		Float left = SelfReviveSecs - (t - downedAt)
 		If PartnerDown()
@@ -193,6 +199,11 @@ Function Wipe()
 		place = here.GetName()
 	EndIf
 	Debug.Notification("Your party was wiped out. You come to near " + place + ".")
+	Int lost = (player.GetGoldAmount() * 0.1) as Int
+	If lost > 0
+		player.RemoveItem(Gold, lost, True)
+		Debug.Notification("You lost " + lost + " gold.")
+	EndIf
 EndFunction
 
 Function StandUp(Float healthFraction)
@@ -210,7 +221,7 @@ ObjectReference Function NearestTown()
 	Float bestDist
 	Int i = 0
 	While world && i < Towns.Length
-		If TownWorlds[i] == world
+		If TownWorlds[i] == world && TownFound[i].CanFastTravelToMarker()
 			Float d = player.GetDistance(Towns[i])
 			If !best || d < bestDist
 				best = Towns[i]
@@ -222,16 +233,35 @@ ObjectReference Function NearestTown()
 	If best
 		Return best
 	EndIf
-	; interiors and walled-city worldspaces
+	; interiors and walled-city worldspaces: a discovered town in this hold
 	Location here = player.GetCurrentLocation()
 	i = 0
 	While here && i < Towns.Length
-		If here == TownHolds[i] || here.IsChild(TownHolds[i])
+		If (here == TownHolds[i] || here.IsChild(TownHolds[i])) && TownFound[i].CanFastTravelToMarker()
+			Return Towns[i]
+		EndIf
+		i += 1
+	EndWhile
+	i = 0
+	While i < Towns.Length
+		If TownFound[i].CanFastTravelToMarker()
 			Return Towns[i]
 		EndIf
 		i += 1
 	EndWhile
 	Return Towns[0]
+EndFunction
+
+Function GuardFastTravel()
+	; Survival already blocks it; this keeps a quest that re-enables fast travel from slipping through
+	Bool survival = SurvivalOn.GetValue() == 1.0
+	If survival && Game.IsFastTravelEnabled()
+		Game.EnableFastTravel(False)
+		travelBlocked = True
+	ElseIf !survival && travelBlocked
+		Game.EnableFastTravel(True)
+		travelBlocked = False
+	EndIf
 EndFunction
 
 ; --- partner and signals ---

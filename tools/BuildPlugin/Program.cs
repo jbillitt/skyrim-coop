@@ -17,31 +17,33 @@ var killActorBranch = FormKey.Factory("013010:Skyrim.esm");
 var sokQuest = FormKey.Factory("000D62:StatsOnKill.esp");
 // Survival Mode's -150 carry weight; with Stats On Kill's 10 base it pins you overencumbered
 var survivalCarry = FormKey.Factory("000887:ccQDRSSE001-SurvivalMode.esl");
+var survivalToggle = FormKey.Factory("000828:ccQDRSSE001-SurvivalMode.esl");
+var gold = FormKey.Factory("00000F:Skyrim.esm");
 var tamriel = "00003C:Skyrim.esm";
 var solstheim = "000800:Dragonborn.esm";
 
-// Party-wipe respawn points: (map marker, hold location, worldspace), capitals first.
-// Walled cities use their stables marker, which is outside in Tamriel.
-(string Marker, string Hold, string World)[] towns =
+// Party-wipe respawn points: (map marker, hold location, worldspace, discovery marker), capitals first.
+// Walled cities land at their stables, which is outside in Tamriel, but count as found once the city is.
+(string Marker, string Hold, string World, string? Found)[] towns =
 [
-    ("072879:Skyrim.esm", "016772:Skyrim.esm", tamriel), // Whiterun Stables
-    ("01635E:Skyrim.esm", "016770:Skyrim.esm", tamriel), // Katla's Farm, Solitude
-    ("09846F:Skyrim.esm", "01676A:Skyrim.esm", tamriel), // Windhelm Stables
-    ("096A46:Skyrim.esm", "01676C:Skyrim.esm", tamriel), // Riften Stables
-    ("0E962F:Skyrim.esm", "016769:Skyrim.esm", tamriel), // Markarth Stables
-    ("017760:Skyrim.esm", "01676F:Skyrim.esm", tamriel), // Falkreath
-    ("01773A:Skyrim.esm", "01676D:Skyrim.esm", tamriel), // Dawnstar
-    ("0177EF:Skyrim.esm", "01676B:Skyrim.esm", tamriel), // Winterhold
-    ("0177B0:Skyrim.esm", "01676E:Skyrim.esm", tamriel), // Morthal
-    ("0143DC:Dragonborn.esm", "016E2A:Dragonborn.esm", solstheim), // Raven Rock
-    ("0162A4:Skyrim.esm", "016772:Skyrim.esm", tamriel), // Riverwood
-    ("0177CC:Skyrim.esm", "016772:Skyrim.esm", tamriel), // Rorikstead
-    ("017791:Skyrim.esm", "01676C:Skyrim.esm", tamriel), // Ivarstead
-    ("0177D7:Skyrim.esm", "01676C:Skyrim.esm", tamriel), // Shor's Stone
-    ("017753:Skyrim.esm", "016770:Skyrim.esm", tamriel), // Dragon Bridge
-    ("01779A:Skyrim.esm", "016769:Skyrim.esm", tamriel), // Karthwasten
-    ("0177A1:Skyrim.esm", "01676A:Skyrim.esm", tamriel), // Kynesgrove
-    ("0143E2:Dragonborn.esm", "016E2A:Dragonborn.esm", solstheim), // Skaal Village
+    ("072879:Skyrim.esm", "016772:Skyrim.esm", tamriel, "0162CE:Skyrim.esm"), // Whiterun Stables
+    ("01635E:Skyrim.esm", "016770:Skyrim.esm", tamriel, "04D0F4:Skyrim.esm"), // Katla's Farm, Solitude
+    ("09846F:Skyrim.esm", "01676A:Skyrim.esm", tamriel, "038436:Skyrim.esm"), // Windhelm Stables
+    ("096A46:Skyrim.esm", "01676C:Skyrim.esm", tamriel, "01C390:Skyrim.esm"), // Riften Stables
+    ("0E962F:Skyrim.esm", "016769:Skyrim.esm", tamriel, "01C38A:Skyrim.esm"), // Markarth Stables
+    ("017760:Skyrim.esm", "01676F:Skyrim.esm", tamriel, null), // Falkreath
+    ("01773A:Skyrim.esm", "01676D:Skyrim.esm", tamriel, null), // Dawnstar
+    ("0177EF:Skyrim.esm", "01676B:Skyrim.esm", tamriel, null), // Winterhold
+    ("0177B0:Skyrim.esm", "01676E:Skyrim.esm", tamriel, null), // Morthal
+    ("0143DC:Dragonborn.esm", "016E2A:Dragonborn.esm", solstheim, null), // Raven Rock
+    ("0162A4:Skyrim.esm", "016772:Skyrim.esm", tamriel, null), // Riverwood
+    ("0177CC:Skyrim.esm", "016772:Skyrim.esm", tamriel, null), // Rorikstead
+    ("017791:Skyrim.esm", "01676C:Skyrim.esm", tamriel, null), // Ivarstead
+    ("0177D7:Skyrim.esm", "01676C:Skyrim.esm", tamriel, null), // Shor's Stone
+    ("017753:Skyrim.esm", "016770:Skyrim.esm", tamriel, null), // Dragon Bridge
+    ("01779A:Skyrim.esm", "016769:Skyrim.esm", tamriel, null), // Karthwasten
+    ("0177A1:Skyrim.esm", "01676A:Skyrim.esm", tamriel, null), // Kynesgrove
+    ("0143E2:Dragonborn.esm", "016E2A:Dragonborn.esm", solstheim, null), // Skaal Village
 ];
 
 var loadOrder = new[] { "Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm", "ccQDRSSE001-SurvivalMode.esl", "StatsOnKill.esp" }
@@ -159,7 +161,10 @@ main.VirtualMachineAdapter = new QuestAdapter
                         Objs("Towns", towns.Select(t => FormKey.Factory(t.Marker))),
                         Objs("TownHolds", towns.Select(t => FormKey.Factory(t.Hold))),
                         Objs("TownWorlds", towns.Select(t => FormKey.Factory(t.World))),
+                        Objs("TownFound", towns.Select(t => FormKey.Factory(t.Found ?? t.Marker))),
                         Obj("SurvivalCarry", survivalCarry),
+                        Obj("SurvivalOn", survivalToggle),
+                        Obj("Gold", gold),
                     },
                 },
             },
