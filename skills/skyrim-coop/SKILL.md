@@ -91,4 +91,6 @@ When Josh says there's a new version, repeat setup step 2. It replaces this fold
 | STR says the server's mods differ | Different mod list or load order | Compare `profiles\Default\modlist.txt` and `plugins.txt` with Josh's |
 | Game updated itself overnight | Steam auto-update | Tell Josh. Ask the user before changing Steam's update setting for Skyrim |
 | Phase 2 crash on start | Engine Fixes isn't confirmed for 1.7.104 | Check `Documents\My Games\Skyrim Special Edition\SKSE\EngineFixes.log`; if it failed, tell Josh |
+| Download sits at 0 bytes as `Unconfirmed NNN.crdownload` | Chrome is waiting on a prompt | Ask the user to open Ctrl+J and click Keep/Resume on that entry |
+| Nexus shows "Download this large file" after Slow download | Files over 500 MB get a choice | Pick **Standard download** |
 | Stats On Kill gives nothing for party kills | Patch not loading, or the distance check failing | Check `SkyrimCoop.esp` is ticked and loads after `StatsOnKill.esp`; send logs |
