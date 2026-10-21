@@ -42,6 +42,8 @@ Bool downed
 Float lastDownSignal
 Float callStart = -1.0
 Float upAt = -100.0
+Float reviveSentAt = -100.0
+Float ackAt = -100.0
 Float nextLookup
 Float partnerDownUntil
 Float wipedAt = -100.0
@@ -66,6 +68,8 @@ Event OnPlayerLoadGame()
 	holdStart = -1.0
 	callStart = -1.0
 	upAt = -100.0
+	reviveSentAt = -100.0
+	ackAt = -100.0
 	nextLookup = 0.0
 	reequipAt = -1.0
 	lastSeen = None
@@ -148,6 +152,7 @@ Event OnUpdate()
 		Debug.Trace("SCD: revive hold done, down=" + PartnerDown() + " inReach=" + PartnerInReach())
 		If PartnerDown() && PartnerInReach()
 			Send(KindRevive)
+			reviveSentAt = Now()
 			partnerDownUntil = 0.0
 			RefreshMarker()
 			Debug.Notification("You got your partner back up.")
@@ -222,12 +227,16 @@ Function Wipe(String why)
 	wipedAt = Now()
 	partnerDownUntil = 0.0
 	Debug.Trace("SCD: wipe: " + why)
-	; a downed partner's PC wipes too when it hears this. Sent before the teleport, as the
-	; partner's stand-in is out of reach after it; twice, as a single one went missing in play
-	Send(KindWipe)
-	Utility.Wait(0.5)
-	Send(KindWipe)
-	Utility.Wait(0.5)
+	; a downed partner's PC wipes too when it hears this. Signals to the partner go missing in play,
+	; so repeat until they answer (their wipe or their getting up), all before the teleport takes us out of reach
+	Float started = Now()
+	Int tries = 0
+	While tries < 12 && ackAt < started && Partner()
+		Send(KindWipe)
+		Utility.Wait(0.5)
+		tries += 1
+	EndWhile
+	Debug.Trace("SCD: wipe sent " + tries + " times, answered=" + (ackAt >= started))
 	StandUp(1.0)
 	Actor player = GetActorReference()
 	player.MoveTo(NearestTown())
@@ -413,6 +422,12 @@ Function OnSignal(Int kind, Actor sender)
 		If Now() - wipedAt < 10.0
 			Return
 		EndIf
+		If Now() - reviveSentAt < 20.0
+			; our revive went missing; they are still down
+			Debug.Trace("SCD: partner still down, resending revive")
+			Send(KindRevive)
+			Return
+		EndIf
 		Bool wasDown = PartnerDown()
 		partnerDownUntil = Now() + DownTtl
 		If downed
@@ -424,6 +439,8 @@ Function OnSignal(Int kind, Actor sender)
 			EndIf
 		EndIf
 	ElseIf kind == KindUp
+		ackAt = Now()
+		reviveSentAt = -100.0
 		partnerDownUntil = 0.0
 		If sender
 			; their stand-in here has no bleedout recovery and may never see their heal
@@ -432,6 +449,7 @@ Function OnSignal(Int kind, Actor sender)
 		EndIf
 		RefreshMarker()
 	ElseIf kind == KindWipe
+		ackAt = Now()
 		If downed
 			Wipe("Your party was wiped out.")
 		EndIf
