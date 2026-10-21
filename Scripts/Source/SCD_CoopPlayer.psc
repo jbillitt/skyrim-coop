@@ -30,6 +30,9 @@ Int Property KindWipe = 4 AutoReadOnly
 Float Property CallHoldSecs = 5.0 AutoReadOnly
 ; after a revive, hits can't put you straight back down
 Float Property GraceSecs = 5.0 AutoReadOnly
+; down with no partner around this long: they wiped (their signal lost) or left, so it's a wipe
+Float Property AloneSecs = 20.0 AutoReadOnly
+; crouched next to the downed partner this long gets them up
 Float Property ReviveHoldSecs = 3.0 AutoReadOnly
 Float Property ReviveRange = 400.0 AutoReadOnly
 ; a downed player re-signals every 5 s, so a lost "up" signal only lingers this long
@@ -47,7 +50,8 @@ Float ackAt = -100.0
 Float nextLookup
 Float partnerDownUntil
 Float wipedAt = -100.0
-Float holdStart = -1.0
+Float helpStart = -1.0
+Float aloneSince = -1.0
 Bool travelBlocked
 Float reequipAt = -1.0
 Actor lastSeen
@@ -65,7 +69,7 @@ Event OnPlayerLoadGame()
 	; real-time stamps restart with the game
 	partnerDownUntil = 0.0
 	wipedAt = -100.0
-	holdStart = -1.0
+	helpStart = -1.0
 	callStart = -1.0
 	upAt = -100.0
 	reviveSentAt = -100.0
@@ -73,6 +77,8 @@ Event OnPlayerLoadGame()
 	nextLookup = 0.0
 	reequipAt = -1.0
 	lastSeen = None
+	; the stand-in a save remembers is gone
+	partner = None
 	Setup()
 EndEvent
 
@@ -117,6 +123,7 @@ Event OnEnterBleedout()
 	EndIf
 	player.SetNoBleedoutRecovery(True)
 	downed = True
+	aloneSince = -1.0
 	Debug.Trace("SCD: downed, partner=" + Partner() + " partnerDown=" + PartnerDown())
 	; an unseen partner is far away, not down, so only a known-down partner means a wipe
 	If PartnerDown()
@@ -124,7 +131,7 @@ Event OnEnterBleedout()
 		Return
 	EndIf
 	Send(KindDown)
-	Debug.Notification("You're down! Your partner has to hold E next to you to get you up.")
+	Debug.Notification("You're down! Your partner has to crouch next to you to get you up.")
 	Debug.Notification("Somewhere they can't reach? Hold E for 5 seconds.")
 	RegisterForSingleUpdate(0.5)
 EndEvent
@@ -142,62 +149,83 @@ Event OnUpdate()
 		ElseIf GetActorReference().IsSwimming() || (callStart >= 0.0 && t - callStart >= CallHoldSecs)
 			callStart = -1.0
 			Rescue()
-		ElseIf t - lastDownSignal >= 5.0
-			Send(KindDown)
+		Else
+			WatchForHelp(t)
 		EndIf
+	ElseIf PartnerDown()
+		Help(t)
+	Else
+		helpStart = -1.0
 	EndIf
 	RefreshMarker()
-	If holdStart >= 0.0 && t - holdStart >= ReviveHoldSecs
-		holdStart = -1.0
-		Debug.Trace("SCD: revive hold done, down=" + PartnerDown() + " inReach=" + PartnerInReach())
-		If PartnerDown() && PartnerInReach()
-			Send(KindRevive)
-			reviveSentAt = Now()
-			partnerDownUntil = 0.0
-			RefreshMarker()
-			Debug.Notification("You got your partner back up.")
-		EndIf
-	EndIf
 	If pendingCredits > 0
 		PayCredits()
 	EndIf
-	If downed || holdStart >= 0.0 || callStart >= 0.0 || pendingCredits > 0 || PartnerDown()
+	If downed || callStart >= 0.0 || pendingCredits > 0 || PartnerDown()
 		RegisterForSingleUpdate(0.5)
 	Else
 		RegisterForSingleUpdate(1.0)
 	EndIf
 EndEvent
 
+; Revive is seen, not signalled: signals to one PC arrived minutes late in play, but STR keeps the
+; partner's position and crouch in sync, so the downed player's own PC watches for them crouching close by
+Function WatchForHelp(Float t)
+	Actor player = GetActorReference()
+	Actor p = Partner()
+	Bool helping = p && p.IsSneaking() && player.GetDistance(p) <= ReviveRange
+	If p
+		aloneSince = -1.0
+	ElseIf aloneSince < 0.0
+		aloneSince = t
+	ElseIf t - aloneSince >= AloneSecs
+		aloneSince = -1.0
+		Wipe("Your party was wiped out.")
+		Return
+	EndIf
+	If t - lastDownSignal >= 5.0
+		Send(KindDown)
+		If p
+			Debug.Trace("SCD: still down, partner dist=" + player.GetDistance(p) + " sneaking=" + p.IsSneaking())
+		EndIf
+	EndIf
+	If !helping
+		helpStart = -1.0
+	ElseIf helpStart < 0.0
+		helpStart = t
+		Debug.Notification("Your partner is helping you up...")
+	ElseIf t - helpStart >= ReviveHoldSecs
+		helpStart = -1.0
+		GetUp(0.5, "Your partner got you back up.")
+	EndIf
+EndFunction
+
+; The helper's side, for feedback; the revive itself happens on the downed player's PC
+Function Help(Float t)
+	If !(GetActorReference().IsSneaking() && PartnerInReach())
+		helpStart = -1.0
+	ElseIf helpStart < 0.0
+		helpStart = t
+		Debug.Notification("Helping your partner up, stay crouched...")
+	ElseIf t - helpStart >= ReviveHoldSecs
+		helpStart = -1.0
+		; for an older patch on their side
+		Send(KindRevive)
+		reviveSentAt = t
+		partnerDownUntil = 0.0
+		Debug.Notification("You got your partner back up.")
+	EndIf
+EndFunction
+
 Event OnControlDown(String control)
 	If downed
 		callStart = Now()
 		Debug.Notification("Calling for help, keep holding...")
 		RegisterForSingleUpdate(0.5)
-		Return
-	EndIf
-	Actor p = Partner()
-	Float dist = -1.0
-	If p
-		dist = GetActorReference().GetDistance(p)
-	EndIf
-	Debug.Trace("SCD: E pressed, partner=" + p + " down=" + PartnerDown() + " dist=" + dist)
-	If !PartnerDown()
-		Return
-	ElseIf !p || dist > ReviveRange
-		Debug.Notification("Get right next to your partner to help them up.")
-	Else
-		holdStart = Now()
-		Debug.Notification("Helping your partner up, keep holding...")
-		RegisterForSingleUpdate(0.5)
 	EndIf
 EndEvent
 
 Event OnControlUp(String control, Float holdTime)
-	If holdStart >= 0.0 && Now() - holdStart < ReviveHoldSecs
-		Debug.Trace("SCD: E released early after " + holdTime)
-		Debug.Notification("Keep holding E to help them up.")
-	EndIf
-	holdStart = -1.0
 	callStart = -1.0
 EndEvent
 
@@ -435,7 +463,7 @@ Function OnSignal(Int kind, Actor sender)
 		Else
 			RefreshMarker()
 			If !wasDown
-				Debug.Notification("Your partner is down! Follow the marker and hold E next to them.")
+				Debug.Notification("Your partner is down! Follow the marker and crouch next to them.")
 			EndIf
 		EndIf
 	ElseIf kind == KindUp

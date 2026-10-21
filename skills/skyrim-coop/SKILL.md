@@ -5,7 +5,7 @@ description: Set up, update, test and troubleshoot Josh and Jesse's Skyrim Toget
 
 # Skyrim co-op setup
 
-Josh and Jesse play Skyrim Special Edition together through Skyrim Together Reborn (STR), with Stats On Kill (levelling from kills) and our own patch, SkyrimCoop. It shares kill credit (when either player lands a kill, both get Stats On Kill rewards) and replaces death with a downed/revive system: at 0 health you bleed out, your partner holds E next to you for 3 seconds to get you up, or you get up yourself after 30 seconds while they are still standing. If both are down at once, or you go down with no partner nearby, the party is wiped and both wake up at the nearest town.
+Josh and Jesse play Skyrim Special Edition together through Skyrim Together Reborn (STR), with Stats On Kill (levelling from kills) and our own patch, SkyrimCoop. It shares kill credit (when either player lands a kill, both get Stats On Kill rewards) and replaces death with a downed/revive system: at 0 health you bleed out, only your partner can get you up, by crouching next to you for 3 seconds. Stuck where they can't reach, or drowning? Hold E for 5 seconds while down to be moved next to them (still down). If both are down at once, or your partner is gone for 20 seconds while you're down, the party is wiped: both wake at the nearest discovered town and lose 10% of their gold.
 
 Everything here mirrors Josh's machine. The mod list and installer in this folder are the same files he uses, so the two installs cannot drift.
 
@@ -72,8 +72,8 @@ It's textures only, so it doesn't need to match Josh's.
 Both players connect to the host's STR server and stand near each other, then:
 
 1. **Kill credit:** take turns killing an enemy. Both players should get Stats On Kill's stat pop-ups for every kill either of you lands, and nothing for kills by NPCs. The partner's pop-ups can lag the killer's by a second or two.
-2. **Revive:** one player gets knocked to 0 health. The other walks up and holds E for 3 seconds; the downed player should stand up. Then let the downed player wait 30 seconds alone; they should get up by themselves.
-3. **Wipe:** both players get downed together. Both should wake at the nearest town.
+2. **Revive:** one player gets knocked to 0 health. The other crouches right next to them for 3 seconds; the downed player should stand up. Then go down again and hold E for 5 seconds; you should be moved next to your partner, still down.
+3. **Wipe:** both players get downed together. Both should wake at the nearest discovered town, each 10% of their gold lighter.
 4. **Send Josh the logs:** zip and send these, with notes on anything that didn't happen as above.
    - `Documents\My Games\Skyrim Special Edition\Logs\Script\Papyrus.0.log` (our lines start with `SCD:`)
    - `Documents\My Games\Skyrim Special Edition\SKSE\` (all `.log` files)
