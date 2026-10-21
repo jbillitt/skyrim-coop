@@ -1,0 +1,34 @@
+{
+  "game": { "steamAppId": 489830, "version": "1.7.104.0" },
+  "mo2": { "version": "2.5.2", "url": "https://github.com/ModOrganizer2/modorganizer/releases/download/v2.5.2/Mod.Organizer-2.5.2.7z" },
+  "mods": [
+    { "name": "SKSE Scripts", "modId": 30379, "fileId": 795992, "version": "2.3.1", "match": "Script Extender.*Steam", "include": ["skse64_2_03_01/Data"],
+      "gameRoot": { "from": "skse64_2_03_01", "files": ["skse64_loader.exe", "skse64_1_7_104.dll"] }, "phase": 1 },
+    { "name": "Address Library", "modId": 32444, "fileId": 795954, "version": "13", "match": "Address Library", "include": ["."], "phase": 1 },
+    { "name": "Skyrim Together Reborn", "modId": 69993, "fileId": 814176, "version": "1.8.3", "match": "Skyrim Together Reborn", "include": ["."],
+      "plugins": ["SkyrimTogether.esp", "SkyrimTogetherQuestPatches.esp"], "phase": 1 },
+    { "name": "Stats On Kill", "modId": 183621, "fileId": 770641, "version": "1.0.2", "match": "StatsOnKill", "include": ["StatsOnKill"],
+      "plugins": ["StatsOnKill.esp"], "phase": 1 },
+    { "name": "SkyrimCoop", "local": true, "version": "0.1", "plugins": ["SkyrimCoop.esp"], "phase": 1 },
+    { "name": "SkyrimCoopProbe", "local": true, "version": "0.1", "plugins": ["SkyrimCoopProbe.esp"], "phase": 1, "testOnly": true },
+
+    { "name": "SkyUI", "modId": 12604, "fileId": 749043, "version": "6.11", "match": "^SkyUI-12604", "include": ["."], "plugins": ["SkyUI_SE.esp"], "phase": 2 },
+    { "name": "SSE Engine Fixes", "modId": 17230, "fileId": 725753, "version": "7.0.20", "match": "Engine Fixes - Main File",
+      "include": ["EngineFixes FOMOD Installer/Required", "EngineFixes FOMOD Installer/AE"], "phase": 2,
+      "note": "Main file says AE 1.6.1170+; confirm it loads on 1.7.104 via the SKSE log before relying on it" },
+    { "name": "SSE Engine Fixes Preloader", "modId": 17230, "fileId": 725261, "version": "7", "match": "Engine Fixes - SKSE64 Preloader",
+      "gameRoot": { "from": ".", "files": ["d3dx9_42.dll"] }, "phase": 2 },
+    { "name": "Assorted Mesh Fixes", "modId": 32117, "fileId": 812136, "version": "0.145", "match": "Assorted Mesh Fixes", "include": ["."], "phase": 2 },
+    { "name": "Community Shaders", "modId": 86492, "fileId": 810029, "version": "1.9.1", "match": "Community Shaders", "include": ["."], "phase": 2 },
+    { "name": "Skyland AIO", "modId": 34179, "fileId": 443514, "fileId1k": null, "version": "4.32", "match": "Skyland AIO", "fomod": true, "optional": true, "phase": 2,
+      "note": "Textures only, no plugin, so players may differ. 2K (6.5 GB) for 8 GB+ VRAM at 1440p+, otherwise the 1k file (2.0 GB). Install through MO2's FOMOD installer; pick Vanilla mountains." },
+
+    { "name": "Cathedral Weathers", "modId": 24791, "fileId": 398809, "version": "2.23c", "match": "Cathedral - Weathers", "include": ["Cathedral Weathers and Seasons"],
+      "plugins": ["Cathedral Weathers.esp"], "phase": 3 },
+    { "name": "USSEP", "modId": 266, "fileId": 800977, "version": "4.3.9c", "match": "Unofficial Skyrim Special Edition Patch", "include": ["."],
+      "plugins": ["unofficial skyrim special edition patch.esp"], "loadFirst": true, "phase": 3 }
+  ],
+  "sdk": [
+    { "name": "SkyUI SDK", "modId": 12604, "fileId": 734848, "match": "SkyUI SDK", "note": "Only needed to compile scripts, not to play" }
+  ]
+}
