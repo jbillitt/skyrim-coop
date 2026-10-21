@@ -4,6 +4,8 @@ SCD_Signal spells, because STR forwards a healing-keyword spell cast on a remote
 
 Quest Property Finder Auto
 ReferenceAlias Property FoundPartner Auto
+Quest Property Marker Auto ; puts a compass marker on a downed partner
+ReferenceAlias Property MarkerTarget Auto
 Spell[] Property Signals Auto ; indexed by SCD_SignalEffect.Kind
 SCD_RewardAlias Property Reward Auto
 ; capitals first, so an interior resolves to its hold's capital
@@ -28,6 +30,8 @@ Actor partner
 Bool downed
 Float downedAt
 Float lastDownSignal
+Float nextNotice
+Bool markerShown
 Float partnerDownUntil
 Float wipedAt = -100.0
 Float holdStart = -1.0
@@ -47,6 +51,8 @@ Event OnPlayerLoadGame()
 	wipedAt = -100.0
 	holdStart = -1.0
 	downedAt = Now()
+	nextNotice = 20.0
+	HideMarker()
 	Setup()
 EndEvent
 
@@ -73,39 +79,57 @@ Event OnEnterBleedout()
 	GetActorReference().SetNoBleedoutRecovery(True)
 	downed = True
 	downedAt = Now()
+	nextNotice = 20.0
 	Debug.Trace("SCD: downed, partner=" + Partner() + " partnerDown=" + PartnerDown())
 	If !Partner() || PartnerDown()
 		Wipe()
 		Return
 	EndIf
 	Send(KindDown)
-	Debug.Notification("You're down! Your partner can hold E next to you to get you up.")
+	Debug.Notification("You're down! Your partner can hold E next to you to get you up, or you get up in 30 seconds.")
 	RegisterForSingleUpdate(1.0)
 EndEvent
 
 Event OnUpdate()
 	Float t = Now()
 	If downed
+		Float left = SelfReviveSecs - (t - downedAt)
 		If PartnerDown()
 			Wipe()
-		ElseIf t - downedAt >= SelfReviveSecs
+		ElseIf left <= 0.0
 			GetUp(0.5, "You get back on your feet.")
-		ElseIf t - lastDownSignal >= 5.0
-			Send(KindDown)
+		Else
+			If left <= nextNotice
+				Debug.Notification("Back on your feet in " + (nextNotice as Int) + " seconds.")
+				If nextNotice > 10.0
+					nextNotice = 10.0
+				ElseIf nextNotice > 5.0
+					nextNotice = 5.0
+				Else
+					nextNotice = -1.0
+				EndIf
+			EndIf
+			If t - lastDownSignal >= 5.0
+				Send(KindDown)
+			EndIf
 		EndIf
+	EndIf
+	If markerShown && !PartnerDown()
+		HideMarker()
 	EndIf
 	If holdStart >= 0.0 && t - holdStart >= ReviveHoldSecs
 		holdStart = -1.0
 		If PartnerDown() && PartnerInReach()
 			Send(KindRevive)
 			partnerDownUntil = 0.0
+			HideMarker()
 			Debug.Notification("You got your partner back up.")
 		EndIf
 	EndIf
 	If pendingCredits > 0
 		PayCredits()
 	EndIf
-	If downed || holdStart >= 0.0 || pendingCredits > 0
+	If downed || holdStart >= 0.0 || pendingCredits > 0 || markerShown
 		RegisterForSingleUpdate(0.5)
 	EndIf
 EndEvent
@@ -144,6 +168,7 @@ Function Wipe()
 	downed = False
 	wipedAt = Now()
 	partnerDownUntil = 0.0
+	HideMarker()
 	Debug.Trace("SCD: party wipe")
 	; a downed partner's PC wipes too when it hears this
 	Send(KindDown)
@@ -253,11 +278,16 @@ Function OnSignal(Int kind, Actor sender)
 		partnerDownUntil = Now() + DownTtl
 		If downed
 			Wipe()
-		ElseIf !wasDown
-			Debug.Notification("Your partner is down! Go to them and hold E.")
+		Else
+			; refreshed on every re-signal, in case STR swapped the stand-in
+			ShowMarker(Partner())
+			If !wasDown
+				Debug.Notification("Your partner is down! Follow the marker and hold E next to them.")
+			EndIf
 		EndIf
 	ElseIf kind == KindUp
 		partnerDownUntil = 0.0
+		HideMarker()
 	ElseIf kind == KindRevive
 		GetUp(0.5, "Your partner got you back up.")
 	ElseIf kind == KindCredit
@@ -267,6 +297,30 @@ Function OnSignal(Int kind, Actor sender)
 		If pendingCredits > 0
 			RegisterForSingleUpdate(0.5)
 		EndIf
+	EndIf
+EndFunction
+
+Function ShowMarker(Actor p)
+	If !p
+		Return
+	EndIf
+	If !markerShown
+		markerShown = True
+		Marker.Start()
+		MarkerTarget.ForceRefTo(p)
+		Marker.SetObjectiveDisplayed(10)
+		Marker.SetActive()
+	Else
+		MarkerTarget.ForceRefTo(p)
+	EndIf
+	RegisterForSingleUpdate(0.5)
+EndFunction
+
+Function HideMarker()
+	If markerShown
+		markerShown = False
+		Marker.SetObjectiveDisplayed(10, False)
+		Marker.Stop()
 	EndIf
 EndFunction
 

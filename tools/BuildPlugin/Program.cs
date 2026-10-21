@@ -85,7 +85,16 @@ foreach (var npc in esm.Npcs.Where(n => n.Factions.Any(f => f.Faction.FormKey ==
 finder.Aliases.Add(partnerAlias);
 finder.NextAliasID = 1;
 
-string[] signalNames = ["Down", "Up", "Revive", "Credit"]; // index = SCD_SignalEffect.Kind
+// Compass/map marker on a downed partner
+var marker = mod.Quests.AddNew("SCD_PartnerDownQuest");
+marker.Name = "Partner down";
+marker.Type = Quest.TypeEnum.Misc;
+marker.Priority = 50;
+marker.Aliases.Add(new QuestAlias { ID = 0, Name = "DownedPartner", Flags = QuestAlias.Flag.Optional | QuestAlias.Flag.AllowReserved });
+marker.NextAliasID = 1;
+marker.Objectives.Add(new QuestObjective { Index = 10, DisplayText = "Help your partner up", Targets = { new QuestObjectiveTarget { AliasID = 0 } } });
+
+string[] signalNames =["Down", "Up", "Revive", "Credit"]; // index = SCD_SignalEffect.Kind
 var signals = new List<FormKey>();
 for (var kind = 0; kind < signalNames.Length; kind++)
 {
@@ -135,6 +144,8 @@ main.VirtualMachineAdapter = new QuestAdapter
                     {
                         Obj("Finder", finder.FormKey),
                         Obj("FoundPartner", finder.FormKey, 0),
+                        Obj("Marker", marker.FormKey),
+                        Obj("MarkerTarget", marker.FormKey, 0),
                         Objs("Signals", signals),
                         Obj("Reward", main.FormKey, 1),
                         Objs("Towns", towns.Select(t => FormKey.Factory(t.Marker))),
