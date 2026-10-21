@@ -5,7 +5,7 @@ description: Set up, update, test and troubleshoot Josh and Jesse's Skyrim Toget
 
 # Skyrim co-op setup
 
-Josh and Jesse play Skyrim Special Edition together through Skyrim Together Reborn (STR), with Stats On Kill (levelling from kills) and our own patch, SkyrimCoop, which gives kill credit to a party member standing nearby. A co-op downed/revive system with party-wipe permadeath (honour system, no save deletion) is planned next.
+Josh and Jesse play Skyrim Special Edition together through Skyrim Together Reborn (STR), with Stats On Kill (levelling from kills) and our own patch, SkyrimCoop. It shares kill credit (when either player lands a kill, both get Stats On Kill rewards) and replaces death with a downed/revive system: at 0 health you bleed out, your partner holds E next to you for 3 seconds to get you up, or you get up yourself after 30 seconds while they are still standing. If both are down at once, or you go down with no partner nearby, the party is wiped and both wake up at the nearest town.
 
 Everything here mirrors Josh's machine. The mod list and installer in this folder are the same files he uses, so the two installs cannot drift.
 
@@ -17,7 +17,7 @@ Everything here mirrors Josh's machine. The mod list and installer in this folde
 - **Stats On Kill's author forbids modifying or re-uploading their files.** Always download it from Nexus. Our patch is a separate plugin and never touches their files.
 - **The game folder** only gets the files `install-mods.ps1` logs in `C:\Games\SkyrimCoop\game-root-files.txt`. Everything else lives in MO2.
 - **Work in phases:** phase 1 (core), then a co-op test, then phase 2, another test, then phase 3. Do not jump ahead because a mod looks good.
-- **Server settings belong to the host** (normally Josh). Until our revive system ships, keep STR's own death system on (`bEnableDeathSystem=true`). Also set `bSyncPlayerCalendar=true` so dates and seasons match.
+- **Server settings belong to the host** (normally Josh). Turn STR's own death system off (`bEnableDeathSystem=false`): our revive system replaces it, and the two fight if both are on. Also set `bSyncPlayerCalendar=true` so dates and seasons match.
 
 ## What gets installed
 
@@ -25,7 +25,7 @@ Everything here mirrors Josh's machine. The mod list and installer in this folde
 
 | Phase | Mods |
 |---|---|
-| 1 | SKSE 2.3.1, Address Library v13, Skyrim Together Reborn 1.8.3, Stats On Kill 1.0.2, SkyrimCoop, SkyrimCoopProbe (test logging) |
+| 1 | SKSE 2.3.1, Address Library v13, Skyrim Together Reborn 1.8.3, Stats On Kill 1.0.2, SkyrimCoop |
 | 2 | SkyUI, SSE Engine Fixes (+ preloader), Assorted Mesh Fixes, Community Shaders, Skyland AIO (optional) |
 | 3 | Cathedral Weathers, USSEP |
 
@@ -54,7 +54,7 @@ For single-player with the same mods minus co-op:
 & "$env:USERPROFILE\.claude\skills\skyrim-coop\scripts\install-mods.ps1" -Profile Solo -Phase 3
 ```
 In MO2, pick the **Solo** profile and launch with **SKSE**, not Skyrim Together.
-- **Off in Solo:** STR, our patch, the probe, Engine Fixes and Community Shaders.
+- **Off in Solo:** STR, our patch, Engine Fixes and Community Shaders.
 - **On in Solo:** Alternate Start (skips Helgen; needs USSEP, which is phase 3).
 - **Saves:** Solo keeps its own, separate from co-op.
 - **Starting a run:** pick any Alternate Start option ("camping in the woods" is quickest). Then cast Stats On Kill's **Setup** power, which wipes your inventory and resets stats on purpose. Then cast **Teleport** for a random spawn. Teleport is reusable at any time.
@@ -67,17 +67,16 @@ It's textures only, so it doesn't need to match Josh's.
 - **Otherwise:** "Skyland AIO 1k" (2.0 GB).
 - Install it from MO2's Downloads tab (it has an installer with choices) and pick the **Vanilla** mountains option.
 
-## Test session (the probe)
+## Test session
 
-The probe plugin logs every kill the game registers and can watch the other player's downed state. Both players do this:
+Both players connect to the host's STR server and stand near each other, then:
 
-1. Connect to the host's STR server and stand near each other.
-2. **Kill test:** take turns killing an enemy. Each kill shows an `SCDProbe kill:` notification. Both players should get Stats On Kill's stat pop-ups. Note who killed what, and whether each player got pop-ups.
-3. **Downed test:** open the console (`~`), click the other player, run `cgf "SCDProbe.Watch"`, close the console, then have the other player get knocked down. Note whether the `bleedout=` value changes.
-4. **Send Josh the logs:** zip and send these.
-   - `Documents\My Games\Skyrim Special Edition\Logs\Script\Papyrus.0.log`
+1. **Kill credit:** take turns killing an enemy. Both players should get Stats On Kill's stat pop-ups for every kill either of you lands, and nothing for kills by NPCs. The partner's pop-ups can lag the killer's by a second or two.
+2. **Revive:** one player gets knocked to 0 health. The other walks up and holds E for 3 seconds; the downed player should stand up. Then let the downed player wait 30 seconds alone; they should get up by themselves.
+3. **Wipe:** both players get downed together. Both should wake at the nearest town.
+4. **Send Josh the logs:** zip and send these, with notes on anything that didn't happen as above.
+   - `Documents\My Games\Skyrim Special Edition\Logs\Script\Papyrus.0.log` (our lines start with `SCD:`)
    - `Documents\My Games\Skyrim Special Edition\SKSE\` (all `.log` files)
-   - Your notes from steps 2 and 3.
 
 ## Updating
 
@@ -93,4 +92,5 @@ When Josh says there's a new version, repeat setup step 2. It replaces this fold
 | Phase 2 crash on start | Engine Fixes isn't confirmed for 1.7.104 | Check `Documents\My Games\Skyrim Special Edition\SKSE\EngineFixes.log`; if it failed, tell Josh |
 | Download sits at 0 bytes as `Unconfirmed NNN.crdownload` | Chrome is waiting on a prompt | Ask the user to open Ctrl+J and click Keep/Resume on that entry |
 | Nexus shows "Download this large file" after Slow download | Files over 500 MB get a choice | Pick **Standard download** |
-| Stats On Kill gives nothing for party kills | Patch not loading, or the distance check failing | Check `SkyrimCoop.esp` is ticked and loads after `StatsOnKill.esp`; send logs |
+| Stats On Kill gives nothing for party kills | Patch not loading, or the partner isn't found | Check `SkyrimCoop.esp` is ticked and loads after `StatsOnKill.esp`; send logs |
+| Going down respawns you after 5 seconds | STR's own death system is still on | The host sets `bEnableDeathSystem=false` in `STServer.ini` and restarts the server |

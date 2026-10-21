@@ -1,9 +1,11 @@
-# Builds dist\SkyrimCoop and dist\SkyrimCoopProbe (each an MO2 mod folder).
-# Needs: Skyrim SE + Creation Kit (Papyrus compiler), SKSE 2.3.1 archive, Stats On Kill's esp.
+# Builds dist\SkyrimCoop (an MO2 mod folder).
+# Needs: Skyrim SE + Creation Kit (Papyrus compiler), SKSE 2.3.1 archive, Stats On Kill's esp and script sources.
 param(
     [string]$Game = 'C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition',
     [string]$SkseArchive = "$env:USERPROFILE\Downloads\Skyrim Script Extender (SKSE64) Steam 30379 2.3.1 2026-08-27T16-52Z s6Og0dG94.7z",
-    [string]$StatsOnKillEsp = 'C:\Games\SkyrimCoop\_installers\StatsOnKill\StatsOnKill\StatsOnKill.esp'
+    [string]$StatsOnKillEsp = 'C:\Games\SkyrimCoop\_installers\StatsOnKill\StatsOnKill\StatsOnKill.esp',
+    # SCD_RewardAlias extends Stats On Kill's script; compiled against only, never shipped
+    [string]$StatsOnKillSource = 'C:\Games\SkyrimCoop\_installers\StatsOnKill\source'
 )
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
@@ -13,6 +15,7 @@ $dist = Join-Path $root 'dist'
 function Need($path, $what) { if (-not (Test-Path $path)) { throw "Missing $what at $path" } }
 Need "$Game\Papyrus Compiler\PapyrusCompiler.exe" 'Papyrus compiler (install the Creation Kit)'
 Need $StatsOnKillEsp 'StatsOnKill.esp'
+Need "$StatsOnKillSource\neth_StatsOnKillScript.psc" 'Stats On Kill script sources'
 
 # Script sources we compile against; extracted once, never into the game folder
 if (-not (Test-Path "$deps\vanilla\Source\Scripts\Actor.psc")) {
@@ -35,7 +38,7 @@ if (-not (Test-Path "$deps\str\SkyrimTogetherUtils.psc")) {
 }
 
 $vanilla = "$deps\vanilla\Source\Scripts"
-$imports = @("$deps\str", "$($skseSrc.FullName)\Data\Scripts\Source", $vanilla)
+$imports = @($StatsOnKillSource, "$deps\str", "$($skseSrc.FullName)\Data\Scripts\Source", $vanilla)
 
 function Compile($sourceDir, $outDir) {
     New-Item -ItemType Directory -Force $outDir | Out-Null
@@ -45,9 +48,8 @@ function Compile($sourceDir, $outDir) {
 }
 
 Compile "$root\Scripts\Source" "$dist\SkyrimCoop\Scripts"
-Compile "$root\probe\Scripts\Source" "$dist\SkyrimCoopProbe\Scripts"
 
-dotnet run --project "$root\tools\BuildPlugin" -c Release -- $StatsOnKillEsp $dist
+dotnet run --project "$root\tools\BuildPlugin" -c Release -- $StatsOnKillEsp "$Game\Data" $dist
 if ($LASTEXITCODE) { throw 'Plugin generation failed' }
 
 Get-ChildItem $dist -Recurse -File | ForEach-Object { $_.FullName.Substring($dist.Length + 1) }

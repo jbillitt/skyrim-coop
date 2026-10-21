@@ -1,154 +1,194 @@
-// Generates SkyrimCoop.esp and SkyrimCoopProbe.esp.
-// Usage: BuildPlugin <path to StatsOnKill.esp> <dist dir>
+// Generates SkyrimCoop.esp.
+// Usage: BuildPlugin <path to StatsOnKill.esp> <game Data dir> <dist dir>
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
 
 var sokPath = args[0];
-var dist = args[1];
+var gameData = args[1];
+var dist = args[2];
 
 var playerNpc = FormKey.Factory("000007:Skyrim.esm");
 var playerRef = FormKey.Factory("000014:Skyrim.esm");
+var playerFaction = FormKey.Factory("000DB1:Skyrim.esm");
+// STR forwards spells with this keyword when cast on a remote player
+var magicRestoreHealth = FormKey.Factory("01CEB0:Skyrim.esm");
 var killActorBranch = FormKey.Factory("013010:Skyrim.esm");
-var sokNode = FormKey.Factory("003311:StatsOnKill.esp");
-const ushort EventR2 = 0x3252; // "R2": the killer in a Kill Actor event
-const float CreditRange = 2048f; // units, about 30 m
+var sokQuest = FormKey.Factory("000D62:StatsOnKill.esp");
+var tamriel = "00003C:Skyrim.esm";
+var solstheim = "000800:Dragonborn.esm";
+
+// Party-wipe respawn points: (map marker, hold location, worldspace), capitals first.
+// Walled cities use their stables marker, which is outside in Tamriel.
+(string Marker, string Hold, string World)[] towns =
+[
+    ("072879:Skyrim.esm", "016772:Skyrim.esm", tamriel), // Whiterun Stables
+    ("01635E:Skyrim.esm", "016770:Skyrim.esm", tamriel), // Katla's Farm, Solitude
+    ("09846F:Skyrim.esm", "01676A:Skyrim.esm", tamriel), // Windhelm Stables
+    ("096A46:Skyrim.esm", "01676C:Skyrim.esm", tamriel), // Riften Stables
+    ("0E962F:Skyrim.esm", "016769:Skyrim.esm", tamriel), // Markarth Stables
+    ("017760:Skyrim.esm", "01676F:Skyrim.esm", tamriel), // Falkreath
+    ("01773A:Skyrim.esm", "01676D:Skyrim.esm", tamriel), // Dawnstar
+    ("0177EF:Skyrim.esm", "01676B:Skyrim.esm", tamriel), // Winterhold
+    ("0177B0:Skyrim.esm", "01676E:Skyrim.esm", tamriel), // Morthal
+    ("0143DC:Dragonborn.esm", "016E2A:Dragonborn.esm", solstheim), // Raven Rock
+    ("0162A4:Skyrim.esm", "016772:Skyrim.esm", tamriel), // Riverwood
+    ("0177CC:Skyrim.esm", "016772:Skyrim.esm", tamriel), // Rorikstead
+    ("017791:Skyrim.esm", "01676C:Skyrim.esm", tamriel), // Ivarstead
+    ("0177D7:Skyrim.esm", "01676C:Skyrim.esm", tamriel), // Shor's Stone
+    ("017753:Skyrim.esm", "016770:Skyrim.esm", tamriel), // Dragon Bridge
+    ("01779A:Skyrim.esm", "016769:Skyrim.esm", tamriel), // Karthwasten
+    ("0177A1:Skyrim.esm", "01676A:Skyrim.esm", tamriel), // Kynesgrove
+    ("0143E2:Dragonborn.esm", "016E2A:Dragonborn.esm", solstheim), // Skaal Village
+];
 
 var loadOrder = new[] { "Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm", "StatsOnKill.esp" }
     .Select(n => ModKey.FromFileName(n)).ToArray();
 
-BuildCoop();
-BuildProbe();
+var mod = new SkyrimMod(ModKey.FromFileName("SkyrimCoop.esp"), SkyrimRelease.SkyrimSE);
+mod.ModHeader.Flags |= SkyrimModHeader.HeaderFlag.Small;
+// 0.1 used 0x800-0x806 for since-removed records that saves still mention
+mod.ModHeader.Stats.NextFormID = 0x900;
 
-void BuildCoop()
+var main = mod.Quests.AddNew("SCD_CoopMainQuest");
+main.Flags = Quest.Flag.StartGameEnabled;
+main.Priority = 50;
+main.Aliases.Add(new QuestAlias
 {
-    var mod = NewLightMod("SkyrimCoop.esp");
+    ID = 0,
+    Name = "Player",
+    ForcedReference = playerRef.ToNullableLink<IPlacedGetter>(),
+    // bleed out instead of dying; SCD_CoopPlayer decides when to get up
+    Flags = QuestAlias.Flag.Essential,
+});
+main.Aliases.Add(new QuestAlias
+{
+    ID = 1,
+    Name = "RewardVictim",
+    Flags = QuestAlias.Flag.Optional | QuestAlias.Flag.AllowReuseInQuest | QuestAlias.Flag.AllowDead,
+});
+main.NextAliasID = 2;
 
-    var party = mod.Factions.AddNew("SCD_PartyFaction");
-    party.Flags = Faction.FactionFlag.HiddenFromPC;
+// Partner = closest PlayerFaction member that is not the player or a vanilla member (housecarls etc.); STR puts stand-ins in it
+var finder = mod.Quests.AddNew("SCD_PartnerFinderQuest");
+finder.Priority = 50;
+var partnerAlias = new QuestAlias
+{
+    ID = 0,
+    Name = "Partner",
+    Flags = QuestAlias.Flag.Optional | QuestAlias.Flag.MatchingRefInLoadedArea | QuestAlias.Flag.MatchingRefClosest | QuestAlias.Flag.AllowReserved,
+};
+partnerAlias.Conditions.Add(Cond(new GetInFactionConditionData(), playerFaction, 1));
+var esm = SkyrimMod.CreateFromBinaryOverlay(Path.Combine(gameData, "Skyrim.esm"), SkyrimRelease.SkyrimSE);
+foreach (var npc in esm.Npcs.Where(n => n.Factions.Any(f => f.Faction.FormKey == playerFaction)))
+    partnerAlias.Conditions.Add(Cond(new GetIsIDConditionData(), npc.FormKey, 0));
+finder.Aliases.Add(partnerAlias);
+finder.NextAliasID = 1;
 
-    var tagEffect = mod.MagicEffects.AddNew("SCD_PartyTagEffect");
-    tagEffect.Archetype = new MagicEffectArchetype { Type = MagicEffectArchetype.TypeEnum.Script };
-    tagEffect.CastType = CastType.Concentration;
-    tagEffect.TargetType = TargetType.Touch;
-    tagEffect.Flags = MagicEffect.Flag.HideInUI | MagicEffect.Flag.NoHitEvent | MagicEffect.Flag.Painless
-        | MagicEffect.Flag.NoMagnitude | MagicEffect.Flag.NoArea | MagicEffect.Flag.NoDuration;
-    tagEffect.VirtualMachineAdapter = Script("SCD_PartyTagEffect", ("SCD_PartyFaction", party.FormKey));
-
-    var tagSpell = mod.Spells.AddNew("SCD_PartyTagSpell");
-    tagSpell.Type = SpellType.Spell;
-    tagSpell.CastType = CastType.Concentration;
-    tagSpell.TargetType = TargetType.Touch;
-    tagSpell.Flags = SpellDataFlag.NoAbsorbOrReflect | SpellDataFlag.IgnoreResistance;
-    tagSpell.Effects.Add(new Effect
+string[] signalNames = ["Down", "Up", "Revive", "Credit"]; // index = SCD_SignalEffect.Kind
+var signals = new List<FormKey>();
+for (var kind = 0; kind < signalNames.Length; kind++)
+{
+    var effect = mod.MagicEffects.AddNew($"SCD_Signal{signalNames[kind]}Effect");
+    effect.Archetype = new MagicEffectArchetype { Type = MagicEffectArchetype.TypeEnum.Script };
+    effect.CastType = CastType.FireAndForget;
+    effect.TargetType = TargetType.TargetActor;
+    effect.Flags = MagicEffect.Flag.HideInUI | MagicEffect.Flag.NoHitEvent | MagicEffect.Flag.Painless
+        | MagicEffect.Flag.NoMagnitude | MagicEffect.Flag.NoArea;
+    // older STR builds look for the keyword on the effect, newer ones also on the spell
+    effect.Keywords = [magicRestoreHealth.ToLink<IKeywordGetter>()];
+    effect.VirtualMachineAdapter = new VirtualMachineAdapter
     {
-        BaseEffect = tagEffect.ToNullableLink(),
-        Data = new EffectData(),
-        // once tagged, stop re-applying
-        Conditions = { Cond(new GetInFactionConditionData { RunOnType = Condition.RunOnType.Subject }, party.FormKey, 0) },
-    });
+        Scripts = { new ScriptEntry { Name = "SCD_SignalEffect", Properties = { Obj("Coop", main.FormKey, 0), new ScriptIntProperty { Name = "Kind", Data = kind } } } },
+    };
 
-    var cloakEffect = mod.MagicEffects.AddNew("SCD_PartyCloakEffect");
-    var cloakArchetype = new MagicEffectArchetype { Type = MagicEffectArchetype.TypeEnum.Cloak };
-    cloakArchetype.Association.SetTo(tagSpell.FormKey);
-    cloakEffect.Archetype = cloakArchetype;
-    cloakEffect.CastType = CastType.ConstantEffect;
-    cloakEffect.TargetType = TargetType.Self;
-    cloakEffect.Flags = MagicEffect.Flag.HideInUI | MagicEffect.Flag.NoHitEvent | MagicEffect.Flag.Painless | MagicEffect.Flag.NoDuration;
+    var spell = mod.Spells.AddNew($"SCD_Signal{signalNames[kind]}");
+    spell.Type = SpellType.Spell;
+    spell.CastType = CastType.FireAndForget;
+    spell.TargetType = TargetType.TargetActor;
+    spell.Flags = SpellDataFlag.ManualCostCalc | SpellDataFlag.NoAbsorbOrReflect | SpellDataFlag.IgnoreResistance;
+    spell.Keywords = [magicRestoreHealth.ToLink<IKeywordGetter>()];
+    spell.Effects.Add(new Effect { BaseEffect = effect.ToNullableLink(), Data = new EffectData { Duration = 1 } });
+    signals.Add(spell.FormKey);
+}
 
-    var cloak = mod.Spells.AddNew("SCD_PartyCloakAbility");
-    cloak.Type = SpellType.Ability;
-    cloak.CastType = CastType.ConstantEffect;
-    cloak.TargetType = TargetType.Self;
-    // cloak magnitude is the radius in feet; ~100 ft covers CreditRange
-    cloak.Effects.Add(new Effect { BaseEffect = cloakEffect.ToNullableLink(), Data = new EffectData { Magnitude = 100 } });
+// Stats On Kill's reward script, configured exactly like its own victim alias
+var sok = SkyrimMod.CreateFromBinaryOverlay(sokPath, SkyrimRelease.SkyrimSE);
+var sokScript = sok.Quests[sokQuest].VirtualMachineAdapter!.Aliases.Single().Scripts.Single(s => s.Name == "neth_StatsOnKillScript");
+var reward = new ScriptEntry { Name = "SCD_RewardAlias" };
+foreach (var p in sokScript.Properties)
+    reward.Properties.Add(p.Name == "Victim" ? Obj("Victim", main.FormKey, 1) : (ScriptProperty)p.DeepCopy());
 
-    var quest = mod.Quests.AddNew("SCD_CoopQuest");
-    quest.Flags = Quest.Flag.StartGameEnabled;
-    quest.Priority = 50;
-    quest.Aliases.Add(new QuestAlias
+main.VirtualMachineAdapter = new QuestAdapter
+{
+    Aliases =
     {
-        ID = 0,
-        Name = "Player",
-        ForcedReference = playerRef.ToNullableLink<IPlacedGetter>(),
-        Spells = { cloak.ToLink() },
-    });
-    quest.NextAliasID = 1;
+        new QuestFragmentAlias
+        {
+            Property = new ScriptObjectProperty { Object = main.ToLink<ISkyrimMajorRecordGetter>(), Alias = 0 },
+            Scripts =
+            {
+                new ScriptEntry
+                {
+                    Name = "SCD_CoopPlayer",
+                    Properties =
+                    {
+                        Obj("Finder", finder.FormKey),
+                        Obj("FoundPartner", finder.FormKey, 0),
+                        Objs("Signals", signals),
+                        Obj("Reward", main.FormKey, 1),
+                        Objs("Towns", towns.Select(t => FormKey.Factory(t.Marker))),
+                        Objs("TownHolds", towns.Select(t => FormKey.Factory(t.Hold))),
+                        Objs("TownWorlds", towns.Select(t => FormKey.Factory(t.World))),
+                    },
+                },
+            },
+        },
+        new QuestFragmentAlias
+        {
+            Property = new ScriptObjectProperty { Object = main.ToLink<ISkyrimMajorRecordGetter>(), Alias = 1 },
+            Scripts = { reward },
+        },
+    },
+};
 
-    // Stats On Kill credits only kills by the local player; also accept a tagged party member in range.
-    // Skyrim groups ORs before ANDs, so (A OR B) AND (A OR C) means A OR (B AND C).
-    var sok = SkyrimMod.CreateFromBinaryOverlay(sokPath, SkyrimRelease.SkyrimSE);
-    var node = mod.StoryManagerQuestNodes.GetOrAddAsOverride(sok.StoryManagerQuestNodes[sokNode]);
-    node.Conditions.Clear();
-    node.Conditions.Add(KillerIsPlayer(Condition.Flag.OR));
-    node.Conditions.Add(Cond(new GetInFactionConditionData(), party.FormKey, 1, killer: true));
-    node.Conditions.Add(KillerIsPlayer(Condition.Flag.OR));
-    node.Conditions.Add(Cond(new GetDistanceConditionData(), playerRef, CreditRange, CompareOperator.LessThan, killer: true));
-
-    Write(mod, Path.Combine(dist, "SkyrimCoop"));
-}
-
-void BuildProbe()
+// Every kill this PC sees, shared so Stats On Kill and vanilla nodes still fire
+var killQuest = mod.Quests.AddNew("SCD_KillQuest");
+killQuest.Event = new RecordType("KILL");
+killQuest.Priority = 50;
+killQuest.VirtualMachineAdapter = new QuestAdapter
 {
-    var mod = NewLightMod("SkyrimCoopProbe.esp");
+    Scripts = { new ScriptEntry { Name = "SCD_KillQuest", Properties = { Obj("Coop", main.FormKey, 0) } } },
+};
+var node = mod.StoryManagerQuestNodes.AddNew("SCD_KillNode");
+node.Parent.SetTo(killActorBranch);
+node.QuestFlags = StoryManagerQuestNode.QuestFlag.SharesEvent;
+node.Quests.Add(new StoryManagerQuest { Quest = new FormLinkNullable<IQuestGetter>(killQuest.FormKey) });
 
-    var quest = mod.Quests.AddNew("SCD_ProbeKillQuest");
-    quest.Event = new RecordType("KILL");
-    quest.Priority = 50;
-    quest.VirtualMachineAdapter = new QuestAdapter { Scripts = { new ScriptEntry { Name = "SCD_ProbeKillQuestScript" } } };
+var dir = Path.Combine(dist, "SkyrimCoop");
+Directory.CreateDirectory(dir);
+var path = Path.Combine(dir, mod.ModKey.FileName);
+mod.BeginWrite.ToPath(path).WithLoadOrder(loadOrder).WithNoDataFolder().Write();
+Console.WriteLine($"wrote {path}");
 
-    var node = mod.StoryManagerQuestNodes.AddNew("SCD_ProbeKillNode");
-    node.Parent.SetTo(killActorBranch);
-    // share the event so Stats On Kill and vanilla nodes still fire
-    node.QuestFlags = StoryManagerQuestNode.QuestFlag.SharesEvent;
-    node.Quests.Add(new StoryManagerQuest { Quest = new FormLinkNullable<IQuestGetter>(quest.FormKey) });
-
-    Write(mod, Path.Combine(dist, "SkyrimCoopProbe"));
-}
-
-SkyrimMod NewLightMod(string name)
+ConditionFloat Cond(ConditionData data, FormKey target, float value)
 {
-    var mod = new SkyrimMod(ModKey.FromFileName(name), SkyrimRelease.SkyrimSE);
-    mod.ModHeader.Flags |= SkyrimModHeader.HeaderFlag.Small;
-    return mod;
-}
-
-ConditionFloat KillerIsPlayer(Condition.Flag flags)
-{
-    var c = Cond(new GetIsIDConditionData(), playerNpc, 1, killer: true);
-    c.Flags = flags;
-    return c;
-}
-
-ConditionFloat Cond(ConditionData data, FormKey target, float value, CompareOperator op = CompareOperator.EqualTo, bool killer = false)
-{
-    if (killer)
-    {
-        data.RunOnType = Condition.RunOnType.EventData;
-        data.RunOnTypeIndex = EventR2;
-    }
     switch (data)
     {
         case GetIsIDConditionData d: d.Object.Link.SetTo(target); break;
         case GetInFactionConditionData d: d.Faction.Link.SetTo(target); break;
-        case GetDistanceConditionData d: d.Target.Link.SetTo(target); break;
         default: throw new ArgumentException(data.GetType().Name);
     }
-    return new ConditionFloat { Data = data, ComparisonValue = value, CompareOperator = op };
+    return new ConditionFloat { Data = data, ComparisonValue = value, CompareOperator = CompareOperator.EqualTo };
 }
 
-VirtualMachineAdapter Script(string name, params (string Name, FormKey Target)[] props)
-{
-    var entry = new ScriptEntry { Name = name };
-    foreach (var (propName, target) in props)
-        entry.Properties.Add(new ScriptObjectProperty { Name = propName, Object = new FormLink<ISkyrimMajorRecordGetter>(target) });
-    return new VirtualMachineAdapter { Scripts = { entry } };
-}
+ScriptObjectProperty Obj(string name, FormKey target, short alias = -1) =>
+    new() { Name = name, Object = new FormLink<ISkyrimMajorRecordGetter>(target), Alias = alias };
 
-void Write(SkyrimMod mod, string dir)
+ScriptObjectListProperty Objs(string name, IEnumerable<FormKey> targets)
 {
-    Directory.CreateDirectory(dir);
-    var path = Path.Combine(dir, mod.ModKey.FileName);
-    mod.BeginWrite.ToPath(path).WithLoadOrder(loadOrder).WithNoDataFolder().Write();
-    Console.WriteLine($"wrote {path}");
+    var list = new ScriptObjectListProperty { Name = name };
+    foreach (var t in targets)
+        list.Objects.Add(Obj("", t));
+    return list;
 }

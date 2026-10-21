@@ -1,15 +1,13 @@
 <#
 Sets up (or updates) the portable MO2 co-op instance from modlist.json. Safe to re-run.
   -Phase 1|2|3   enable mods up to this phase (others stay installed but off)
-  -NoProbe       leave the test plugin off
-  -LocalMods     folder holding our own built mods (SkyrimCoop, SkyrimCoopProbe)
+  -LocalMods     folder holding our own built mods (SkyrimCoop)
   -Profile       Default (co-op) or Solo (no STR, own saves); mods opt out with "coop": false / "solo": false
 Exit code 2 means some archives still need downloading; the missing list prints with Nexus links.
 #>
 param(
     [ValidateRange(1, 3)][int]$Phase = 1,
     [ValidateSet('Default', 'Solo')][string]$Profile = 'Default',
-    [switch]$NoProbe,
     [string]$Root = 'C:\Games\SkyrimCoop',
     [string]$LocalMods = (Join-Path $PSScriptRoot '..\mods'),
     [string]$Downloads = (Join-Path $env:USERPROFILE 'Downloads')
@@ -111,7 +109,7 @@ if (-not (Test-Path "$mo\ModOrganizer.ini")) {
     Write-Text "$mo\ModOrganizer.ini" $ini
 }
 
-# --- profile: local inis copied from the game's, with Papyrus logging on for the probe ---
+# --- profile: local inis copied from the game's, with Papyrus logging on for troubleshooting ---
 # Solo keeps its own saves so co-op characters never load without STR
 Write-Text "$profileDir\settings.ini" "[General]`r`nLocalSaves=$($solo.ToString().ToLower())`r`nLocalSettings=true`r`nAutomaticArchiveInvalidation=false`r`n"
 if ($solo) { New-Item -ItemType Directory -Force "$profileDir\saves" | Out-Null }
@@ -135,7 +133,7 @@ $missing = @()
 $logged = @(if (Test-Path $rootLog) { Get-Content $rootLog })
 foreach ($m in $list.mods) {
     $inProfile = if ($solo) { $m.solo -ne $false } else { $m.coop -ne $false }
-    $enabled = $inProfile -and $m.phase -le $Phase -and -not ($m.testOnly -and $NoProbe)
+    $enabled = $inProfile -and $m.phase -le $Phase
     $dest = Join-Path $mo "mods\$($m.name)"
     $m | Add-Member -NotePropertyName enabled -NotePropertyValue $enabled -Force
 
