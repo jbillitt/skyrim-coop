@@ -1,6 +1,8 @@
 Scriptname SCD_CoopPlayer extends ReferenceAlias
 {On the player: downed/revive, party wipe and shared kill credit. The two PCs talk through the
-SCD_Signal spells, because STR forwards a healing-keyword spell cast on a remote player to that player's PC.}
+SCD_Signal spells, because STR forwards a healing-keyword spell cast on a remote player to that player's PC.
+STR delivers those through one queue that stalls 4 s on any entry it can't resolve, so each event sends one
+signal and nothing is repeated.}
 
 Quest Property Finder Auto
 ReferenceAlias Property FoundPartner Auto
@@ -24,36 +26,34 @@ Spell Property SurvivalCarry Auto
 
 Int Property KindDown = 0 AutoReadOnly
 Int Property KindUp = 1 AutoReadOnly
-Int Property KindRevive = 2 AutoReadOnly
+Int Property KindRevive = 2 AutoReadOnly ; sent by patches before 0.11
 Int Property KindCredit = 3 AutoReadOnly
 Int Property KindWipe = 4 AutoReadOnly
 
-; held while down: moved to the partner, or a wipe if they can't be reached
+; held while down: moved to the partner (stuck or drowning); held while standing: unstick
 Float Property CallHoldSecs = 5.0 AutoReadOnly
 ; after a revive, hits can't put you straight back down
 Float Property GraceSecs = 5.0 AutoReadOnly
-; down with no partner around this long: they wiped (their signal lost) or left, so it's a wipe
-Float Property AloneSecs = 20.0 AutoReadOnly
 ; crouched next to the downed partner this long gets them up
 Float Property ReviveHoldSecs = 3.0 AutoReadOnly
 Float Property ReviveRange = 400.0 AutoReadOnly
-; a downed player re-signals every 5 s, so a lost "up" signal only lingers this long
-Float Property DownTtl = 12.0 AutoReadOnly
+; a downed player can't walk, so a stand-in that moves this far is up
+Float Property MovedRange = 150.0 AutoReadOnly
 Float Property VictimTtl = 5.0 AutoReadOnly
 Float Property CreditWait = 3.0 AutoReadOnly
 
 Actor partner
 Bool downed
-Float lastDownSignal
+Bool partnerIsDown
+; we stood the partner's stand-in up and it hasn't finished getting up yet
+Bool standInRecovering
+Float downX
+Float downY
 Float callStart = -1.0
 Float upAt = -100.0
-Float reviveSentAt = -100.0
-Float ackAt = -100.0
 Float nextLookup
-Float partnerDownUntil
 Float wipedAt = -100.0
 Float helpStart = -1.0
-Float aloneSince = -1.0
 ; when to snap our player / the partner's stand-in back to the default pose
 Float poseResetAt = -1.0
 Float standInResetAt = -1.0
@@ -72,13 +72,12 @@ EndEvent
 
 Event OnPlayerLoadGame()
 	; real-time stamps restart with the game
-	partnerDownUntil = 0.0
+	partnerIsDown = False
+	standInRecovering = False
 	wipedAt = -100.0
 	helpStart = -1.0
 	callStart = -1.0
 	upAt = -100.0
-	reviveSentAt = -100.0
-	ackAt = -100.0
 	nextLookup = 0.0
 	reequipAt = -1.0
 	poseResetAt = -1.0
@@ -132,10 +131,8 @@ Event OnEnterBleedout()
 	EndIf
 	player.SetNoBleedoutRecovery(True)
 	downed = True
-	aloneSince = -1.0
-	Debug.Trace("SCD: downed, partner=" + Partner() + " partnerDown=" + PartnerDown())
-	; an unseen partner is far away, not down, so only a known-down partner means a wipe
-	If PartnerDown()
+	Debug.Trace("SCD: downed, partner=" + Partner() + " partnerDown=" + partnerIsDown)
+	If partnerIsDown
 		Wipe("Your party was wiped out.")
 		Return
 	EndIf
@@ -163,9 +160,7 @@ Event OnUpdate()
 		EndIf
 	EndIf
 	If downed
-		If PartnerDown()
-			Wipe("Your party was wiped out.")
-		ElseIf GetActorReference().IsSwimming() || (callStart >= 0.0 && t - callStart >= CallHoldSecs)
+		If GetActorReference().IsSwimming() || (callStart >= 0.0 && t - callStart >= CallHoldSecs)
 			callStart = -1.0
 			Rescue()
 		Else
@@ -173,14 +168,8 @@ Event OnUpdate()
 		EndIf
 	ElseIf callStart >= 0.0 && t - callStart >= CallHoldSecs
 		callStart = -1.0
-		Debug.Trace("SCD: unstick")
-		ResetPose(GetActorReference())
-		Reequip()
-		If partner
-			ResetPose(partner)
-		EndIf
-		Debug.Notification("Reset your pose and gear.")
-	ElseIf PartnerDown()
+		Unstick()
+	ElseIf partnerIsDown
 		Help(t)
 	Else
 		helpStart = -1.0
@@ -189,35 +178,18 @@ Event OnUpdate()
 	If pendingCredits > 0
 		PayCredits()
 	EndIf
-	If downed || callStart >= 0.0 || pendingCredits > 0 || PartnerDown()
+	If downed || callStart >= 0.0 || pendingCredits > 0 || partnerIsDown
 		RegisterForSingleUpdate(0.5)
 	Else
 		RegisterForSingleUpdate(1.0)
 	EndIf
 EndEvent
 
-; Revive is seen, not signalled: signals to one PC arrived minutes late in play, but STR keeps the
-; partner's position and crouch in sync, so the downed player's own PC watches for them crouching close by
+; Revive is seen, not signalled: STR keeps the partner's position and crouch in sync, so the
+; downed player's own PC watches for them crouching close by
 Function WatchForHelp(Float t)
-	Actor player = GetActorReference()
 	Actor p = Partner()
-	Bool helping = p && p.IsSneaking() && player.GetDistance(p) <= ReviveRange
-	If p
-		aloneSince = -1.0
-	ElseIf aloneSince < 0.0
-		aloneSince = t
-	ElseIf t - aloneSince >= AloneSecs
-		aloneSince = -1.0
-		Wipe("Your party was wiped out.")
-		Return
-	EndIf
-	If t - lastDownSignal >= 5.0
-		Send(KindDown)
-		If p
-			Debug.Trace("SCD: still down, partner dist=" + player.GetDistance(p) + " sneaking=" + p.IsSneaking())
-		EndIf
-	EndIf
-	If !helping
+	If !(p && p.IsSneaking() && GetActorReference().GetDistance(p) <= ReviveRange)
 		helpStart = -1.0
 	ElseIf helpStart < 0.0
 		helpStart = t
@@ -228,25 +200,22 @@ Function WatchForHelp(Float t)
 	EndIf
 EndFunction
 
-; The helper's side, for feedback; the revive itself happens on the downed player's PC
+; The helper's side: the same 3 s, seen from here
 Function Help(Float t)
-	If !(GetActorReference().IsSneaking() && PartnerInReach())
+	Actor p = Partner()
+	If !(p && GetActorReference().IsSneaking() && GetActorReference().GetDistance(p) <= ReviveRange)
 		helpStart = -1.0
 	ElseIf helpStart < 0.0
 		helpStart = t
 		Debug.Notification("Helping your partner up, stay crouched...")
 	ElseIf t - helpStart >= ReviveHoldSecs
 		helpStart = -1.0
-		; for an older patch on their side
-		Send(KindRevive)
-		reviveSentAt = t
-		partnerDownUntil = 0.0
+		PartnerUp(p)
 		Debug.Notification("You got your partner back up.")
 	EndIf
 EndFunction
 
 Event OnControlDown(String control)
-	; held while down: call for help; held while standing: unstick both of us
 	callStart = Now()
 	If downed
 		Debug.Notification("Calling for help, keep holding...")
@@ -275,7 +244,7 @@ Function GetUp(Float healthFraction, String msg)
 	EndIf
 EndFunction
 
-; Down, and nobody can get you up: wake in the nearest discovered town, 10% poorer
+; Both down: wake in the nearest discovered town, 10% poorer
 Function Wipe(String why)
 	If !downed
 		Return
@@ -283,18 +252,10 @@ Function Wipe(String why)
 	downed = False
 	callStart = -1.0
 	wipedAt = Now()
-	partnerDownUntil = 0.0
+	partnerIsDown = False
 	Debug.Trace("SCD: wipe: " + why)
-	; a downed partner's PC wipes too when it hears this. Signals to the partner go missing in play,
-	; so repeat until they answer (their wipe or their getting up), all before the teleport takes us out of reach
-	Float started = Now()
-	Int tries = 0
-	While tries < 12 && ackAt < started && Partner()
-		Send(KindWipe)
-		Utility.Wait(0.5)
-		tries += 1
-	EndWhile
-	Debug.Trace("SCD: wipe sent " + tries + " times, answered=" + (ackAt >= started))
+	; sent before the teleport takes us out of the partner's reach; a downed partner wipes on hearing it
+	Send(KindWipe)
 	StandUp(1.0)
 	Actor player = GetActorReference()
 	player.MoveTo(NearestTown())
@@ -316,9 +277,8 @@ EndFunction
 ; drowned, or stuck where the partner can't reach: still down, but next to them
 Function Rescue()
 	Actor p = Partner()
-	If p && !PartnerDown()
+	If p && !partnerIsDown
 		GetActorReference().MoveTo(p, 60.0)
-		Send(KindDown)
 		Debug.Notification("You were brought to your partner. They still have to get you up.")
 	Else
 		Wipe("Nobody could reach you.")
@@ -371,6 +331,8 @@ ObjectReference Function NearestTown()
 	Return Towns[0]
 EndFunction
 
+; --- keeping the two screens looking right ---
+
 ; After a teleport STR's copy of us on the partner's PC draws no hands or feet until our gear changes
 Function Reequip()
 	Actor player = GetActorReference()
@@ -384,6 +346,48 @@ Function ReequipSlot(Actor player, Int slotMask)
 	If worn
 		player.UnequipItem(worn, False, True)
 		player.EquipItem(worn, False, True)
+	EndIf
+EndFunction
+
+; Getting up from bleedout can leave a body stuck mid-animation (arms bent back); the default-state
+; idle snaps it out, and STR forwards it from our player to the partner's screen
+Function ResetPose(Actor a)
+	If a.IsBleedingOut() || a.GetSitState() != 0
+		Return
+	EndIf
+	Debug.SendAnimationEvent(a, "IdleForceDefaultState")
+EndFunction
+
+Function Unstick()
+	Debug.Trace("SCD: unstick")
+	ResetPose(GetActorReference())
+	Reequip()
+	If partner
+		ResetPose(partner)
+	EndIf
+	Debug.Notification("Reset your pose and gear.")
+EndFunction
+
+; Their signal or their stand-in here going into bleedout (STR syncs health), whichever comes first
+Function PartnerWentDown(Actor p)
+	partnerIsDown = True
+	If p
+		downX = p.GetPositionX()
+		downY = p.GetPositionY()
+	EndIf
+	Debug.Trace("SCD: partner down")
+	Debug.Notification("Your partner is down! Follow the marker and crouch next to them.")
+	RegisterForSingleUpdate(0.5)
+EndFunction
+; The partner is up. STR's stand-in for them has no bleedout recovery and never gets their heal,
+; so stand it up here too
+Function PartnerUp(Actor p)
+	partnerIsDown = False
+	If p
+		standInRecovering = True
+		p.SetNoBleedoutRecovery(False)
+		p.RestoreActorValue("Health", p.GetActorValueMax("Health"))
+		standInResetAt = Now() + 2.0
 	EndIf
 EndFunction
 
@@ -415,10 +419,8 @@ Actor Function Partner()
 	EndWhile
 	Finder.Start()
 	partner = FoundPartner.GetActorReference()
-	Debug.Trace("SCD: finder found " + partner + " remote=" + (partner && SkyrimTogetherUtils.IsRemotePlayer(partner)))
 	If !(partner && SkyrimTogetherUtils.IsRemotePlayer(partner))
 		partner = ScanForPartner()
-		Debug.Trace("SCD: scan found " + partner)
 	EndIf
 	Return partner
 EndFunction
@@ -451,15 +453,6 @@ Actor Function ScanForPartner()
 	Return None
 EndFunction
 
-Bool Function PartnerDown()
-	Return Now() < partnerDownUntil
-EndFunction
-
-Bool Function PartnerInReach()
-	Actor p = Partner()
-	Return p && GetActorReference().GetDistance(p) <= ReviveRange
-EndFunction
-
 Function Send(Int kind)
 	Actor p = Partner()
 	If !p
@@ -470,49 +463,28 @@ Function Send(Int kind)
 		signal = Signals[kind]
 	EndIf
 	signal.Cast(GetActorReference(), p)
-	If kind == KindDown
-		lastDownSignal = Now()
-	EndIf
 EndFunction
 
+; STR now delivers these without a caster, so the sender is not used
 Function OnSignal(Int kind, Actor sender)
-	Debug.Trace("SCD: signal " + kind + " from " + sender)
-	If sender && SkyrimTogetherUtils.IsRemotePlayer(sender)
-		partner = sender
-	EndIf
+	Debug.Trace("SCD: signal " + kind)
 	If kind == KindDown
-		; the partner wiping with us echoes back; ignore it
+		; the partner going down with us arrives after our wipe; it's the same wipe
 		If Now() - wipedAt < 10.0
 			Return
 		EndIf
-		If Now() - reviveSentAt < 20.0
-			; our revive went missing; they are still down
-			Debug.Trace("SCD: partner still down, resending revive")
-			Send(KindRevive)
-			Return
-		EndIf
-		Bool wasDown = PartnerDown()
-		partnerDownUntil = Now() + DownTtl
 		If downed
 			Wipe("Your party was wiped out.")
-		Else
-			RefreshMarker()
-			If !wasDown
-				Debug.Notification("Your partner is down! Follow the marker and crouch next to them.")
-			EndIf
+			Return
+		EndIf
+		If !partnerIsDown
+			PartnerWentDown(Partner())
 		EndIf
 	ElseIf kind == KindUp
-		ackAt = Now()
-		reviveSentAt = -100.0
-		partnerDownUntil = 0.0
-		; STR now delivers these without a caster, so use the partner we know
-		Actor p = Partner()
-		If p
-			StandInUp(p)
-		EndIf
+		PartnerUp(Partner())
 		RefreshMarker()
 	ElseIf kind == KindWipe
-		ackAt = Now()
+		partnerIsDown = False
 		If downed
 			Wipe("Your party was wiped out.")
 		EndIf
@@ -528,26 +500,10 @@ Function OnSignal(Int kind, Actor sender)
 	EndIf
 EndFunction
 
-; STR's stand-in for the partner has no bleedout recovery and may never get their heal, so it stays
-; lying down here after they are up
-; Getting up from bleedout can leave a body stuck mid-animation (arms bent back); the default-state
-; idle snaps it out, and STR forwards it from our player to the partner's screen
-Function ResetPose(Actor a)
-	If a.IsBleedingOut() || a.GetSitState() != 0
-		Return
-	EndIf
-	Debug.SendAnimationEvent(a, "IdleForceDefaultState")
-EndFunction
-Function StandInUp(Actor p)
-	p.SetNoBleedoutRecovery(False)
-	p.RestoreActorValue("Health", p.GetActorValueMax("Health"))
-	standInResetAt = Now() + 2.0
-EndFunction
-
 Function RefreshMarker()
 	Actor p = partner
 	; a missing partner costs a finder restart, so look again only every few seconds
-	If (p && p.Is3DLoaded()) || PartnerDown() || Now() >= nextLookup
+	If (p && p.Is3DLoaded()) || partnerIsDown || Now() >= nextLookup
 		p = Partner()
 		If !p
 			nextLookup = Now() + 5.0
@@ -556,21 +512,30 @@ Function RefreshMarker()
 		p = None
 	EndIf
 	If p && p != lastSeen
+		Debug.Trace("SCD: partner is " + p)
 		; a fresh stand-in for the partner usually means they got a fresh one of us too
 		reequipAt = Now() + 2.0
 	EndIf
 	lastSeen = p
 	If p
-		; STR stand-ins never recover from bleedout, so one stays down after its player is back up
-		If !PartnerDown() && p.IsBleedingOut()
-			StandInUp(p)
+		If partnerIsDown
+			; their "up" can go missing on the way here; someone who walks off is up
+			Float dx = p.GetPositionX() - downX
+			Float dy = p.GetPositionY() - downY
+			If dx * dx + dy * dy > MovedRange * MovedRange
+				PartnerUp(p)
+			EndIf
+		ElseIf standInRecovering
+			standInRecovering = p.IsBleedingOut()
+		ElseIf p.IsBleedingOut()
+			PartnerWentDown(p)
 		EndIf
 		; re-forced each tick, in case STR swapped the stand-in
 		MarkerTarget.ForceRefTo(p)
 	Else
 		MarkerTarget.Clear()
 	EndIf
-	Marker.SetObjectiveDisplayed(20, p && PartnerDown())
+	Marker.SetObjectiveDisplayed(20, p && partnerIsDown)
 EndFunction
 
 ; --- shared kill credit ---

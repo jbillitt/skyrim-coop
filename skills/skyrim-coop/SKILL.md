@@ -5,7 +5,7 @@ description: Set up, update, test and troubleshoot Josh and Jesse's Skyrim Toget
 
 # Skyrim co-op setup
 
-Josh and Jesse play Skyrim Special Edition together through Skyrim Together Reborn (STR), with Stats On Kill (levelling from kills) and our own patch, SkyrimCoop. It shares kill credit (when either player lands a kill, both get Stats On Kill rewards) and replaces death with a downed/revive system: at 0 health you bleed out, only your partner can get you up, by crouching next to you for 3 seconds. Stuck where they can't reach, or drowning? Hold E for 5 seconds while down to be moved next to them (still down). If both are down at once, or your partner is gone for 20 seconds while you're down, the party is wiped: both wake at the nearest discovered town and lose 10% of their gold.
+Josh and Jesse play Skyrim Special Edition together through Skyrim Together Reborn (STR), with Stats On Kill (levelling from kills) and our own patch, SkyrimCoop. It shares kill credit (when either player lands a kill, both get Stats On Kill rewards) and replaces death with a downed/revive system: at 0 health you bleed out, only your partner can get you up, by crouching next to you for 3 seconds. Stuck where they can't reach, or drowning? Hold E for 5 seconds while down to be moved next to them (still down). If both are down at once, the party is wiped: both wake at the nearest discovered town and lose 10% of their gold.
 
 Everything here mirrors Josh's machine. The mod list and installer in this folder are the same files he uses, so the two installs cannot drift.
 
