@@ -46,6 +46,36 @@ function Find-Archive($mod) {
 
 function Write-Text($path, $text) { [IO.File]::WriteAllText($path, $text) }
 
+# Applies a FOMOD installer non-interactively: $choices maps group name -> chosen option names
+function Install-Fomod($archive, $dest, $choices) {
+    if (Test-Path $tmp) { Remove-Item -LiteralPath $tmp -Recurse -Force }
+    New-Item -ItemType Directory $tmp | Out-Null
+    & tar.exe -x -f $archive -C $tmp
+    if ($LASTEXITCODE -ne 0) { throw "Could not extract $archive" }
+    $config = Get-ChildItem $tmp -Recurse -Filter ModuleConfig.xml | Select-Object -First 1
+    $base = Split-Path (Split-Path $config.FullName)
+    [xml]$x = Get-Content -LiteralPath $config.FullName
+    New-Item -ItemType Directory $dest | Out-Null
+    foreach ($g in $x.SelectNodes('//installStep/optionalFileGroups/group')) {
+        $picked = $choices.($g.name)
+        foreach ($p in $g.plugins.plugin) {
+            if ($picked -notcontains $p.name) { continue }
+            foreach ($item in $p.files.ChildNodes) {
+                $src = Join-Path $base $item.source
+                $to = Join-Path $dest $item.destination
+                if ($item.LocalName -eq 'folder') {
+                    New-Item -ItemType Directory -Force $to | Out-Null
+                    Copy-Item -Path (Join-Path $src '*') -Destination $to -Recurse -Force
+                } else {
+                    New-Item -ItemType Directory -Force (Split-Path $to) | Out-Null
+                    Copy-Item -LiteralPath $src $to -Force
+                }
+            }
+        }
+    }
+    Remove-Item -LiteralPath $tmp -Recurse -Force
+}
+
 # --- game ---
 $game = Find-GamePath
 $ver = (Get-Item "$game\SkyrimSE.exe").VersionInfo.FileVersion
@@ -131,7 +161,14 @@ foreach ($m in $list.mods) {
     Write-Text "$stored.meta" "[General]`r`ngameName=skyrimse`r`nmodID=$($m.modId)`r`nfileID=$($m.fileId)`r`nversion=$($m.version)`r`nrepository=Nexus`r`ninstalled=true`r`n"
 
     if ($m.fomod) {
-        if (-not (Test-Path $dest)) { "$($m.name): install it from MO2's Downloads tab (it has an installer with choices)"; $m.enabled = $false }
+        if (-not (Test-Path $dest)) {
+            if ($m.fomodChoices) {
+                "Installing $($m.name) $($m.version) with the recorded installer choices (large, takes a while)"
+                Install-Fomod $stored $dest $m.fomodChoices
+                Write-Text "$dest\meta.ini" "[General]`r`ngameName=SkyrimSE`r`nmodid=$($m.modId)`r`nversion=$($m.version)`r`ninstallationFile=$($archive.Name)`r`nrepository=Nexus`r`n[installedFiles]`r`n1\modid=$($m.modId)`r`n1\fileid=$($m.fileId)`r`nsize=1`r`n"
+                "Installed $($m.name) $($m.version)"
+            } else { "$($m.name): install it from MO2's Downloads tab (it has an installer with choices)"; $m.enabled = $false }
+        }
         continue
     }
     if ($m.include -and -not (Test-Path $dest)) {

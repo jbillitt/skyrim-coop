@@ -23,8 +23,16 @@
       "gameRoot": { "from": ".", "files": ["d3dx9_42.dll"] }, "phase": 2 },
     { "name": "Assorted Mesh Fixes", "modId": 32117, "fileId": 812136, "version": "0.145", "match": "Assorted Mesh Fixes", "include": ["."], "phase": 2 },
     { "name": "Community Shaders", "solo": false, "modId": 86492, "fileId": 810029, "version": "1.9.1", "match": "Community Shaders", "include": ["."], "phase": 2 },
-    { "name": "Skyland AIO", "modId": 34179, "fileId": 443514, "fileId1k": null, "version": "4.32", "match": "Skyland AIO", "fomod": true, "optional": true, "phase": 2,
-      "note": "Textures only, no plugin, so players may differ. 2K (6.5 GB) for 8 GB+ VRAM at 1440p+, otherwise the 1k file (2.0 GB). Install through MO2's FOMOD installer; pick Vanilla mountains." },
+    { "name": "Skyland AIO", "modId": 34179, "fileId": 443514, "fileId1k": null, "version": "4.32", "match": "Skyland AIO", "fomod": true, "optional": true, "phase": 1,
+      "fomodChoices": {
+        "Install Landscapes": ["Yes"], "Add Blended Roads": ["Yes"], "Add Blended Road SMIM Patch": ["No"],
+        "Snowy Roads": ["Snowy Stone Roads"], "Dirt Roads": ["No"], "Select Mountain Types": ["Tan"],
+        "Select Cities to Install": ["Whiterun", "Winterhold", "Riften", "Markarth", "Solitude", "High Hrothgar", "Windhelm", "Sovngarde", "Skyhaven Temple"],
+        "Towns, Villages and Farmhouses": ["Brown"], "Imperial Forts": ["Yes"], "Nordic Ruins": ["Yes"], "Boats, Ships, and Shacks": ["Yes"],
+        "Imperial and Nordic Tents": ["Yes"], "Skyland Windows": ["Yes"], "Replace All Road Signs": ["Yes"], "Add Road Sign Lanterns": ["No"],
+        "Select Watercolor": ["None"], "Skyland Night Skies": ["Skyking Galaxy (Favorite)"], "Install Dawnguard": ["Yes"], "Install Dragonborn": ["Yes"]
+      },
+      "note": "Textures only, no plugin, so players may differ. 2K (6.5 GB) for 8 GB+ VRAM at 1440p+, otherwise the 1k file (2.0 GB). The installer applies fomodChoices; road-sign lanterns and watercolour stay off because they add plugins, which would then have to match between players." },
 
     { "name": "Cathedral Weathers", "modId": 24791, "fileId": 398809, "version": "2.23c", "match": "Cathedral - Weathers", "include": ["Cathedral Weathers and Seasons"],
       "plugins": ["Cathedral Weathers.esp"], "phase": 3 },
