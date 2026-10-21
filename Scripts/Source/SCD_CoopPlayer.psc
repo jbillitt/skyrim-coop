@@ -251,10 +251,39 @@ Actor Function Partner()
 	Finder.Start()
 	partner = FoundPartner.GetActorReference()
 	Debug.Trace("SCD: finder found " + partner + " remote=" + (partner && SkyrimTogetherUtils.IsRemotePlayer(partner)))
-	If partner && !SkyrimTogetherUtils.IsRemotePlayer(partner)
-		partner = None
+	If !(partner && SkyrimTogetherUtils.IsRemotePlayer(partner))
+		partner = ScanForPartner()
+		Debug.Trace("SCD: scan found " + partner)
 	EndIf
 	Return partner
+EndFunction
+
+Actor Function ScanForPartner()
+	Actor player = GetActorReference()
+	; STR spawns the stand-in in our cell (62 = Character)
+	Cell here = player.GetParentCell()
+	Int n = 0
+	If here
+		n = here.GetNumRefs(62)
+	EndIf
+	Int i = 0
+	While i < n
+		Actor inCell = here.GetNthRef(i, 62) as Actor
+		If inCell && inCell != player && SkyrimTogetherUtils.IsRemotePlayer(inCell)
+			Return inCell
+		EndIf
+		i += 1
+	EndWhile
+	; it may have walked into a neighbouring cell
+	i = 0
+	While i < 20
+		Actor nearby = Game.FindRandomActorFromRef(player, 8192.0)
+		If nearby && nearby != player && SkyrimTogetherUtils.IsRemotePlayer(nearby)
+			Return nearby
+		EndIf
+		i += 1
+	EndWhile
+	Return None
 EndFunction
 
 Bool Function PartnerDown()
@@ -299,6 +328,9 @@ Function OnSignal(Int kind, Actor sender)
 		EndIf
 	ElseIf kind == KindUp
 		partnerDownUntil = 0.0
+		If sender
+			sender.SetNoBleedoutRecovery(False)
+		EndIf
 		RefreshMarker()
 	ElseIf kind == KindRevive
 		GetUp(0.5, "Your partner got you back up.")
@@ -324,6 +356,10 @@ Function RefreshMarker()
 		p = None
 	EndIf
 	If p
+		; STR stand-ins never recover from bleedout, so one stays down after its player is back up
+		If !PartnerDown() && p.IsBleedingOut()
+			p.SetNoBleedoutRecovery(False)
+		EndIf
 		; re-forced each tick, in case STR swapped the stand-in
 		MarkerTarget.ForceRefTo(p)
 	Else
