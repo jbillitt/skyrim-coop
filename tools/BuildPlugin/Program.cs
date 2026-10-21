@@ -99,11 +99,18 @@ marker.NextAliasID = 1;
 marker.Objectives.Add(new QuestObjective { Index = 10, DisplayText = "Your partner", Targets = { new QuestObjectiveTarget { AliasID = 0 } } });
 marker.Objectives.Add(new QuestObjective { Index = 20, DisplayText = "Help your partner up", Targets = { new QuestObjectiveTarget { AliasID = 0 } } });
 
-string[] signalNames =["Down", "Up", "Revive", "Credit"]; // index = SCD_SignalEffect.Kind
+// index = SCD_SignalEffect.Kind; kinds added later get fixed FormIDs so older saves keep their records
+string[] signalNames = ["Down", "Up", "Revive", "Credit", "Wipe"];
 var signals = new List<FormKey>();
-for (var kind = 0; kind < signalNames.Length; kind++)
+for (var kind = 0; kind < 4; kind++)
+    signals.Add(Signal(kind, null, null));
+signals.Add(Signal(4, new FormKey(mod.ModKey, 0x9F0), new FormKey(mod.ModKey, 0x9F1)));
+
+FormKey Signal(int kind, FormKey? effectKey, FormKey? spellKey)
 {
-    var effect = mod.MagicEffects.AddNew($"SCD_Signal{signalNames[kind]}Effect");
+    var name = $"SCD_Signal{signalNames[kind]}";
+    var effect = effectKey is { } ek ? mod.MagicEffects.AddNew(ek) : mod.MagicEffects.AddNew();
+    effect.EditorID = name + "Effect";
     effect.Archetype = new MagicEffectArchetype { Type = MagicEffectArchetype.TypeEnum.Script };
     effect.CastType = CastType.FireAndForget;
     effect.TargetType = TargetType.TargetActor;
@@ -116,14 +123,15 @@ for (var kind = 0; kind < signalNames.Length; kind++)
         Scripts = { new ScriptEntry { Name = "SCD_SignalEffect", Properties = { Obj("Coop", main.FormKey, 0), new ScriptIntProperty { Name = "Kind", Data = kind } } } },
     };
 
-    var spell = mod.Spells.AddNew($"SCD_Signal{signalNames[kind]}");
+    var spell = spellKey is { } sk ? mod.Spells.AddNew(sk) : mod.Spells.AddNew();
+    spell.EditorID = name;
     spell.Type = SpellType.Spell;
     spell.CastType = CastType.FireAndForget;
     spell.TargetType = TargetType.TargetActor;
     spell.Flags = SpellDataFlag.ManualCostCalc | SpellDataFlag.NoAbsorbOrReflect | SpellDataFlag.IgnoreResistance;
     spell.Keywords = [magicRestoreHealth.ToLink<IKeywordGetter>()];
     spell.Effects.Add(new Effect { BaseEffect = effect.ToNullableLink(), Data = new EffectData { Duration = 1 } });
-    signals.Add(spell.FormKey);
+    return spell.FormKey;
 }
 
 var survival = SkyrimMod.CreateFromBinaryOverlay(Path.Combine(gameData, "ccQDRSSE001-SurvivalMode.esl"), SkyrimRelease.SkyrimSE);
@@ -167,6 +175,7 @@ main.VirtualMachineAdapter = new QuestAdapter
                         Obj("Gold", gold),
                     },
                 },
+                new ScriptEntry { Name = "SCD_ContainerEat" },
             },
         },
         new QuestFragmentAlias

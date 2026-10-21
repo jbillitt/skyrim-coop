@@ -24,10 +24,14 @@ Int Property KindDown = 0 AutoReadOnly
 Int Property KindUp = 1 AutoReadOnly
 Int Property KindRevive = 2 AutoReadOnly
 Int Property KindCredit = 3 AutoReadOnly
+Int Property KindWipe = 4 AutoReadOnly
 
-Float Property SelfReviveSecs = 30.0 AutoReadOnly
+; held while down: moved to the partner, or a wipe if they can't be reached
+Float Property CallHoldSecs = 5.0 AutoReadOnly
+; after a revive, hits can't put you straight back down
+Float Property GraceSecs = 5.0 AutoReadOnly
 Float Property ReviveHoldSecs = 3.0 AutoReadOnly
-Float Property ReviveRange = 250.0 AutoReadOnly
+Float Property ReviveRange = 400.0 AutoReadOnly
 ; a downed player re-signals every 5 s, so a lost "up" signal only lingers this long
 Float Property DownTtl = 12.0 AutoReadOnly
 Float Property VictimTtl = 5.0 AutoReadOnly
@@ -35,14 +39,16 @@ Float Property CreditWait = 3.0 AutoReadOnly
 
 Actor partner
 Bool downed
-Float downedAt
 Float lastDownSignal
-Float nextNotice
+Float callStart = -1.0
+Float upAt = -100.0
 Float nextLookup
 Float partnerDownUntil
 Float wipedAt = -100.0
 Float holdStart = -1.0
 Bool travelBlocked
+Float reequipAt = -1.0
+Actor lastSeen
 Actor[] victims
 Float[] victimTimes
 Int nextVictim
@@ -58,10 +64,16 @@ Event OnPlayerLoadGame()
 	partnerDownUntil = 0.0
 	wipedAt = -100.0
 	holdStart = -1.0
-	downedAt = Now()
-	nextNotice = 20.0
+	callStart = -1.0
+	upAt = -100.0
 	nextLookup = 0.0
+	reequipAt = -1.0
+	lastSeen = None
 	Setup()
+EndEvent
+
+Event OnPlayerFastTravelEnd(Float afTravelGameTimeHours)
+	reequipAt = Now() + 3.0
 EndEvent
 
 Function Setup()
@@ -93,49 +105,47 @@ Event OnEnterBleedout()
 	If downed
 		Return
 	EndIf
-	GetActorReference().SetNoBleedoutRecovery(True)
+	Actor player = GetActorReference()
+	If Now() - upAt < GraceSecs
+		; just revived: shrug it off
+		player.RestoreActorValue("Health", player.GetActorValueMax("Health") * 0.5 - player.GetActorValue("Health"))
+		Return
+	EndIf
+	player.SetNoBleedoutRecovery(True)
 	downed = True
-	downedAt = Now()
-	nextNotice = 20.0
 	Debug.Trace("SCD: downed, partner=" + Partner() + " partnerDown=" + PartnerDown())
 	; an unseen partner is far away, not down, so only a known-down partner means a wipe
 	If PartnerDown()
-		Wipe()
+		Wipe("Your party was wiped out.")
 		Return
 	EndIf
 	Send(KindDown)
-	Debug.Notification("You're down! Your partner can hold E next to you to get you up, or you get up in 30 seconds.")
-	RegisterForSingleUpdate(1.0)
+	Debug.Notification("You're down! Your partner has to hold E next to you to get you up.")
+	Debug.Notification("Somewhere they can't reach? Hold E for 5 seconds.")
+	RegisterForSingleUpdate(0.5)
 EndEvent
 
 Event OnUpdate()
 	Float t = Now()
 	GuardFastTravel()
+	If reequipAt >= 0.0 && t >= reequipAt
+		reequipAt = -1.0
+		Reequip()
+	EndIf
 	If downed
-		Float left = SelfReviveSecs - (t - downedAt)
 		If PartnerDown()
-			Wipe()
-		ElseIf left <= 0.0
-			GetUp(0.5, "You get back on your feet.")
-		Else
-			If left <= nextNotice
-				Debug.Notification("Back on your feet in " + (nextNotice as Int) + " seconds.")
-				If nextNotice > 10.0
-					nextNotice = 10.0
-				ElseIf nextNotice > 5.0
-					nextNotice = 5.0
-				Else
-					nextNotice = -1.0
-				EndIf
-			EndIf
-			If t - lastDownSignal >= 5.0
-				Send(KindDown)
-			EndIf
+			Wipe("Your party was wiped out.")
+		ElseIf GetActorReference().IsSwimming() || (callStart >= 0.0 && t - callStart >= CallHoldSecs)
+			callStart = -1.0
+			Rescue()
+		ElseIf t - lastDownSignal >= 5.0
+			Send(KindDown)
 		EndIf
 	EndIf
 	RefreshMarker()
 	If holdStart >= 0.0 && t - holdStart >= ReviveHoldSecs
 		holdStart = -1.0
+		Debug.Trace("SCD: revive hold done, down=" + PartnerDown() + " inReach=" + PartnerInReach())
 		If PartnerDown() && PartnerInReach()
 			Send(KindRevive)
 			partnerDownUntil = 0.0
@@ -146,7 +156,7 @@ Event OnUpdate()
 	If pendingCredits > 0
 		PayCredits()
 	EndIf
-	If downed || holdStart >= 0.0 || pendingCredits > 0 || PartnerDown()
+	If downed || holdStart >= 0.0 || callStart >= 0.0 || pendingCredits > 0 || PartnerDown()
 		RegisterForSingleUpdate(0.5)
 	Else
 		RegisterForSingleUpdate(1.0)
@@ -154,7 +164,23 @@ Event OnUpdate()
 EndEvent
 
 Event OnControlDown(String control)
-	If !downed && PartnerDown() && PartnerInReach()
+	If downed
+		callStart = Now()
+		Debug.Notification("Calling for help, keep holding...")
+		RegisterForSingleUpdate(0.5)
+		Return
+	EndIf
+	Actor p = Partner()
+	Float dist = -1.0
+	If p
+		dist = GetActorReference().GetDistance(p)
+	EndIf
+	Debug.Trace("SCD: E pressed, partner=" + p + " down=" + PartnerDown() + " dist=" + dist)
+	If !PartnerDown()
+		Return
+	ElseIf !p || dist > ReviveRange
+		Debug.Notification("Get right next to your partner to help them up.")
+	Else
 		holdStart = Now()
 		Debug.Notification("Helping your partner up, keep holding...")
 		RegisterForSingleUpdate(0.5)
@@ -162,7 +188,12 @@ Event OnControlDown(String control)
 EndEvent
 
 Event OnControlUp(String control, Float holdTime)
+	If holdStart >= 0.0 && Now() - holdStart < ReviveHoldSecs
+		Debug.Trace("SCD: E released early after " + holdTime)
+		Debug.Notification("Keep holding E to help them up.")
+	EndIf
 	holdStart = -1.0
+	callStart = -1.0
 EndEvent
 
 Function GetUp(Float healthFraction, String msg)
@@ -170,6 +201,7 @@ Function GetUp(Float healthFraction, String msg)
 		Return
 	EndIf
 	downed = False
+	upAt = Now()
 	StandUp(healthFraction)
 	Debug.Notification(msg)
 	Utility.Wait(3.0)
@@ -180,29 +212,48 @@ Function GetUp(Float healthFraction, String msg)
 	EndIf
 EndFunction
 
-Function Wipe()
+; Down, and nobody can get you up: wake in the nearest discovered town, 10% poorer
+Function Wipe(String why)
 	If !downed
 		Return
 	EndIf
 	downed = False
+	callStart = -1.0
 	wipedAt = Now()
 	partnerDownUntil = 0.0
-	Debug.Trace("SCD: party wipe")
-	; a downed partner's PC wipes too when it hears this
-	Send(KindDown)
+	Debug.Trace("SCD: wipe: " + why)
+	; a downed partner's PC wipes too when it hears this. Sent before the teleport, as the
+	; partner's stand-in is out of reach after it; twice, as a single one went missing in play
+	Send(KindWipe)
+	Utility.Wait(0.5)
+	Send(KindWipe)
+	Utility.Wait(0.5)
 	StandUp(1.0)
 	Actor player = GetActorReference()
 	player.MoveTo(NearestTown())
+	reequipAt = Now() + 3.0
 	String place = "the nearest town"
 	Location here = player.GetCurrentLocation()
 	If here
 		place = here.GetName()
 	EndIf
-	Debug.Notification("Your party was wiped out. You come to near " + place + ".")
+	Debug.Notification(why + " You come to near " + place + ".")
 	Int lost = (player.GetGoldAmount() * 0.1) as Int
 	If lost > 0
 		player.RemoveItem(Gold, lost, True)
 		Debug.Notification("You lost " + lost + " gold.")
+	EndIf
+EndFunction
+
+; drowned, or stuck where the partner can't reach: still down, but next to them
+Function Rescue()
+	Actor p = Partner()
+	If p && !PartnerDown()
+		GetActorReference().MoveTo(p, 60.0)
+		Send(KindDown)
+		Debug.Notification("You were brought to your partner. They still have to get you up.")
+	Else
+		Wipe("Nobody could reach you.")
 	EndIf
 EndFunction
 
@@ -250,6 +301,22 @@ ObjectReference Function NearestTown()
 		i += 1
 	EndWhile
 	Return Towns[0]
+EndFunction
+
+; After a teleport STR's copy of us on the partner's PC draws no hands or feet until our gear changes
+Function Reequip()
+	Actor player = GetActorReference()
+	ReequipSlot(player, 0x04) ; body
+	ReequipSlot(player, 0x08) ; hands
+	ReequipSlot(player, 0x80) ; feet
+EndFunction
+
+Function ReequipSlot(Actor player, Int slotMask)
+	Armor worn = player.GetWornForm(slotMask) as Armor
+	If worn
+		player.UnequipItem(worn, False, True)
+		player.EquipItem(worn, False, True)
+	EndIf
 EndFunction
 
 Function GuardFastTravel()
@@ -349,7 +416,7 @@ Function OnSignal(Int kind, Actor sender)
 		Bool wasDown = PartnerDown()
 		partnerDownUntil = Now() + DownTtl
 		If downed
-			Wipe()
+			Wipe("Your party was wiped out.")
 		Else
 			RefreshMarker()
 			If !wasDown
@@ -359,9 +426,15 @@ Function OnSignal(Int kind, Actor sender)
 	ElseIf kind == KindUp
 		partnerDownUntil = 0.0
 		If sender
+			; their stand-in here has no bleedout recovery and may never see their heal
 			sender.SetNoBleedoutRecovery(False)
+			sender.RestoreActorValue("Health", sender.GetActorValueMax("Health"))
 		EndIf
 		RefreshMarker()
+	ElseIf kind == KindWipe
+		If downed
+			Wipe("Your party was wiped out.")
+		EndIf
 	ElseIf kind == KindRevive
 		GetUp(0.5, "Your partner got you back up.")
 	ElseIf kind == KindCredit
@@ -385,6 +458,11 @@ Function RefreshMarker()
 	Else
 		p = None
 	EndIf
+	If p && p != lastSeen
+		; a fresh stand-in for the partner usually means they got a fresh one of us too
+		reequipAt = Now() + 2.0
+	EndIf
+	lastSeen = p
 	If p
 		; STR stand-ins never recover from bleedout, so one stays down after its player is back up
 		If !PartnerDown() && p.IsBleedingOut()
