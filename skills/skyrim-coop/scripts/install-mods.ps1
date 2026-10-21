@@ -182,6 +182,17 @@ foreach ($m in $list.mods) {
         "Installed $($m.name) $($m.version)"
     }
 
+    # Folders that must physically exist in the game's Data folder for every profile (inert unless used)
+    foreach ($d in $m.gameData) {
+        $target = Join-Path $game "Data\$d"
+        $src = Join-Path $dest $d
+        if ((Test-Path $src) -and -not (Test-Path (Join-Path $target 'SkyrimTogether.exe'))) {
+            Copy-Item -LiteralPath $src -Destination (Join-Path $game 'Data') -Recurse -Force
+            $logged += $target
+            "Game Data folder: added $d"
+        }
+    }
+
     # Files the game loads directly from its own folder, outside MO2
     if ($m.gameRoot) {
         foreach ($f in $m.gameRoot.files) {

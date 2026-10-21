@@ -6,14 +6,15 @@
       "gameRoot": { "from": "skse64_2_03_01", "files": ["skse64_loader.exe", "skse64_1_7_104.dll"] }, "phase": 1 },
     { "name": "Address Library", "modId": 32444, "fileId": 795954, "version": "13", "match": "Address Library", "include": ["."], "phase": 1 },
     { "name": "Skyrim Together Reborn", "solo": false, "modId": 69993, "fileId": 814176, "version": "1.8.3", "match": "Skyrim Together Reborn", "include": ["."],
-      "plugins": ["SkyrimTogether.esp", "SkyrimTogetherQuestPatches.esp"], "phase": 1 },
+      "plugins": ["SkyrimTogether.esp", "SkyrimTogetherQuestPatches.esp"], "phase": 1,
+      "gameData": ["SkyrimTogetherReborn"], "note": "STR looks for its UI helper (TPProcess.exe) in the real Data folder; through MO2 alone it falls back to starting a second, plain SkyrimSE.exe" },
     { "name": "Stats On Kill", "modId": 183621, "fileId": 770641, "version": "1.0.2", "match": "StatsOnKill", "include": ["StatsOnKill"],
       "plugins": ["StatsOnKill.esp"], "phase": 1 },
     { "name": "SkyrimCoop", "local": true, "solo": false, "version": "0.1", "plugins": ["SkyrimCoop.esp"], "phase": 1 },
     { "name": "SkyrimCoopProbe", "local": true, "solo": false, "version": "0.1", "plugins": ["SkyrimCoopProbe.esp"], "phase": 1, "testOnly": true },
 
-    { "name": "Alternate Start - Live Another Life", "coop": false, "modId": 272, "fileId": 729409, "version": "4.2.6a", "match": "Alternate Start - Live Another Life", "include": ["."],
-      "plugins": ["alternate start - live another life.esp"], "phase": 1, "note": "Solo only: skips the Helgen intro. Needs USSEP." },
+    { "name": "Alternate Start - Live Another Life", "modId": 272, "fileId": 729409, "version": "4.2.6a", "match": "Alternate Start - Live Another Life", "include": ["."],
+      "plugins": ["alternate start - live another life.esp"], "phase": 1, "note": "Skips the Helgen intro; start, then connect. Needs USSEP." },
 
     { "name": "SkyUI", "modId": 12604, "fileId": 749043, "version": "6.11", "match": "^SkyUI-12604", "include": ["."], "plugins": ["SkyUI_SE.esp"], "phase": 2 },
     { "name": "SSE Engine Fixes", "solo": false, "modId": 17230, "fileId": 725753, "version": "7.0.20", "match": "Engine Fixes - Main File",
@@ -37,7 +38,7 @@
     { "name": "Cathedral Weathers", "modId": 24791, "fileId": 398809, "version": "2.23c", "match": "Cathedral - Weathers", "include": ["Cathedral Weathers and Seasons"],
       "plugins": ["Cathedral Weathers.esp"], "phase": 3 },
     { "name": "USSEP", "modId": 266, "fileId": 800977, "version": "4.3.9c", "match": "Unofficial Skyrim Special Edition Patch", "include": ["."],
-      "plugins": ["unofficial skyrim special edition patch.esp"], "loadFirst": true, "phase": 3 }
+      "plugins": ["unofficial skyrim special edition patch.esp"], "loadFirst": true, "phase": 1 }
   ],
   "sdk": [
     { "name": "SkyUI SDK", "modId": 12604, "fileId": 734848, "match": "SkyUI SDK", "note": "Only needed to compile scripts, not to play" }
