@@ -165,6 +165,7 @@ main.VirtualMachineAdapter = new QuestAdapter
                         Obj("Marker", marker.FormKey),
                         Obj("MarkerTarget", marker.FormKey, 0),
                         Objs("Signals", signals),
+                        Obj("WipeSignal", signals[4]),
                         Obj("Reward", main.FormKey, 1),
                         Objs("Towns", towns.Select(t => FormKey.Factory(t.Marker))),
                         Objs("TownHolds", towns.Select(t => FormKey.Factory(t.Hold))),

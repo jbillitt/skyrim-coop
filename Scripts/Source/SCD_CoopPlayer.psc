@@ -7,6 +7,8 @@ ReferenceAlias Property FoundPartner Auto
 Quest Property Marker Auto ; compass marker on the partner; objective 20 while they are down
 ReferenceAlias Property MarkerTarget Auto
 Spell[] Property Signals Auto ; indexed by SCD_SignalEffect.Kind
+; saves keep the 4-entry Signals array they were made with, so later kinds get their own property
+Spell Property WipeSignal Auto
 ; a script-typed alias property fails to bind ("not the right type"), so it is cast at use
 ReferenceAlias Property Reward Auto
 ; capitals first, so an interior resolves to its hold's capital
@@ -97,11 +99,13 @@ Function Setup()
 		player.RemoveSpell(SurvivalCarry)
 		player.AddSpell(SurvivalCarry, False)
 	EndIf
+	; older versions could leave the quest running with the objective off, so set it up every load
 	If !Marker.IsRunning()
 		Marker.Start()
-		Marker.SetObjectiveDisplayed(10)
-		Marker.SetActive()
 	EndIf
+	Marker.SetObjectiveDisplayed(10)
+	Marker.SetActive()
+	Debug.Trace("SCD: marker running=" + Marker.IsRunning() + " shown=" + Marker.IsObjectiveDisplayed(10) + " active=" + Marker.IsActive())
 	RegisterForSingleUpdate(1.0)
 EndFunction
 
@@ -434,7 +438,11 @@ Function Send(Int kind)
 	If !p
 		Return
 	EndIf
-	Signals[kind].Cast(GetActorReference(), p)
+	Spell signal = WipeSignal
+	If kind != KindWipe
+		signal = Signals[kind]
+	EndIf
+	signal.Cast(GetActorReference(), p)
 	If kind == KindDown
 		lastDownSignal = Now()
 	EndIf
@@ -470,10 +478,10 @@ Function OnSignal(Int kind, Actor sender)
 		ackAt = Now()
 		reviveSentAt = -100.0
 		partnerDownUntil = 0.0
-		If sender
-			; their stand-in here has no bleedout recovery and may never see their heal
-			sender.SetNoBleedoutRecovery(False)
-			sender.RestoreActorValue("Health", sender.GetActorValueMax("Health"))
+		; STR now delivers these without a caster, so use the partner we know
+		Actor p = Partner()
+		If p
+			StandInUp(p)
 		EndIf
 		RefreshMarker()
 	ElseIf kind == KindWipe
@@ -491,6 +499,13 @@ Function OnSignal(Int kind, Actor sender)
 			RegisterForSingleUpdate(0.5)
 		EndIf
 	EndIf
+EndFunction
+
+; STR's stand-in for the partner has no bleedout recovery and may never get their heal, so it stays
+; lying down here after they are up
+Function StandInUp(Actor p)
+	p.SetNoBleedoutRecovery(False)
+	p.RestoreActorValue("Health", p.GetActorValueMax("Health"))
 EndFunction
 
 Function RefreshMarker()
@@ -512,7 +527,7 @@ Function RefreshMarker()
 	If p
 		; STR stand-ins never recover from bleedout, so one stays down after its player is back up
 		If !PartnerDown() && p.IsBleedingOut()
-			p.SetNoBleedoutRecovery(False)
+			StandInUp(p)
 		EndIf
 		; re-forced each tick, in case STR swapped the stand-in
 		MarkerTarget.ForceRefTo(p)
