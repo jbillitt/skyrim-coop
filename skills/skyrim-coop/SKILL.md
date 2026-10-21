@@ -94,3 +94,4 @@ When Josh says there's a new version, repeat setup step 2. It replaces this fold
 | Nexus shows "Download this large file" after Slow download | Files over 500 MB get a choice | Pick **Standard download** |
 | Stats On Kill gives nothing for party kills | Patch not loading, or the partner isn't found | Check `SkyrimCoop.esp` is ticked and loads after `StatsOnKill.esp`; send logs |
 | Going down respawns you after 5 seconds | STR's own death system is still on | The host sets `bEnableDeathSystem=false` in `STServer.ini` and restarts the server |
+| The other player looks wrong: no hands or feet, lying down while running, arms bent back | STR's copy of them didn't follow a teleport or a get-up animation | Either player holds E for 5 seconds while standing (resets pose and gear on both screens); if that fails, reconnect in STR (F2) |

@@ -54,6 +54,9 @@ Float partnerDownUntil
 Float wipedAt = -100.0
 Float helpStart = -1.0
 Float aloneSince = -1.0
+; when to snap our player / the partner's stand-in back to the default pose
+Float poseResetAt = -1.0
+Float standInResetAt = -1.0
 Bool travelBlocked
 Float reequipAt = -1.0
 Actor lastSeen
@@ -78,6 +81,8 @@ Event OnPlayerLoadGame()
 	ackAt = -100.0
 	nextLookup = 0.0
 	reequipAt = -1.0
+	poseResetAt = -1.0
+	standInResetAt = -1.0
 	lastSeen = None
 	; the stand-in a save remembers is gone
 	partner = None
@@ -147,6 +152,16 @@ Event OnUpdate()
 		reequipAt = -1.0
 		Reequip()
 	EndIf
+	If poseResetAt >= 0.0 && t >= poseResetAt
+		poseResetAt = -1.0
+		ResetPose(GetActorReference())
+	EndIf
+	If standInResetAt >= 0.0 && t >= standInResetAt
+		standInResetAt = -1.0
+		If partner
+			ResetPose(partner)
+		EndIf
+	EndIf
 	If downed
 		If PartnerDown()
 			Wipe("Your party was wiped out.")
@@ -156,6 +171,15 @@ Event OnUpdate()
 		Else
 			WatchForHelp(t)
 		EndIf
+	ElseIf callStart >= 0.0 && t - callStart >= CallHoldSecs
+		callStart = -1.0
+		Debug.Trace("SCD: unstick")
+		ResetPose(GetActorReference())
+		Reequip()
+		If partner
+			ResetPose(partner)
+		EndIf
+		Debug.Notification("Reset your pose and gear.")
 	ElseIf PartnerDown()
 		Help(t)
 	Else
@@ -222,11 +246,12 @@ Function Help(Float t)
 EndFunction
 
 Event OnControlDown(String control)
+	; held while down: call for help; held while standing: unstick both of us
+	callStart = Now()
 	If downed
-		callStart = Now()
 		Debug.Notification("Calling for help, keep holding...")
-		RegisterForSingleUpdate(0.5)
 	EndIf
+	RegisterForSingleUpdate(0.5)
 EndEvent
 
 Event OnControlUp(String control, Float holdTime)
@@ -240,6 +265,7 @@ Function GetUp(Float healthFraction, String msg)
 	downed = False
 	upAt = Now()
 	StandUp(healthFraction)
+	poseResetAt = upAt + 4.0
 	Debug.Notification(msg)
 	Utility.Wait(3.0)
 	Actor player = GetActorReference()
@@ -273,6 +299,7 @@ Function Wipe(String why)
 	Actor player = GetActorReference()
 	player.MoveTo(NearestTown())
 	reequipAt = Now() + 3.0
+	poseResetAt = Now() + 4.0
 	String place = "the nearest town"
 	Location here = player.GetCurrentLocation()
 	If here
@@ -503,9 +530,18 @@ EndFunction
 
 ; STR's stand-in for the partner has no bleedout recovery and may never get their heal, so it stays
 ; lying down here after they are up
+; Getting up from bleedout can leave a body stuck mid-animation (arms bent back); the default-state
+; idle snaps it out, and STR forwards it from our player to the partner's screen
+Function ResetPose(Actor a)
+	If a.IsBleedingOut() || a.GetSitState() != 0
+		Return
+	EndIf
+	Debug.SendAnimationEvent(a, "IdleForceDefaultState")
+EndFunction
 Function StandInUp(Actor p)
 	p.SetNoBleedoutRecovery(False)
 	p.RestoreActorValue("Health", p.GetActorValueMax("Health"))
+	standInResetAt = Now() + 2.0
 EndFunction
 
 Function RefreshMarker()
