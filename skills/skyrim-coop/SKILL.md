@@ -32,7 +32,12 @@ Everything here mirrors Josh's machine. The mod list and installer in this folde
 ## Setup
 
 1. **Steam:** Skyrim Special Edition installed, launched once to the main menu, then quit. The installer refuses any version other than `1.7.104.0`. If Steam has already moved on to a newer version, stop and tell Josh; do not try to downgrade on your own.
-2. **This folder** should live at `%USERPROFILE%\.claude\skills\skyrim-coop`, with our built mods in its `mods\` subfolder (they ship in the zip from Josh).
+2. **Get the kit:** download the latest build from the public link below (no GitHub account needed), then unzip it so this folder is at `%USERPROFILE%\.claude\skills\skyrim-coop`, with our built mods in its `mods\` subfolder.
+   ```powershell
+   $zip = "$env:TEMP\SkyrimCoop-kit.zip"
+   curl.exe -sSL -o $zip https://github.com/jbillitt/skyrim-coop/releases/latest/download/SkyrimCoop-kit.zip
+   tar.exe -x -f $zip -C "$env:USERPROFILE\.claude\skills"
+   ```
 3. **Run the installer:**
    ```powershell
    & "$env:USERPROFILE\.claude\skills\skyrim-coop\scripts\install-mods.ps1" -Phase 1
@@ -64,7 +69,7 @@ The probe plugin logs every kill the game registers and can watch the other play
 
 ## Updating
 
-Josh sends a new zip of this skill. Replace this folder with it, keeping the game install, then run `install-mods.ps1` again with the current phase. It refreshes our own mods every run and only installs Nexus mods that aren't there yet.
+When Josh says there's a new version, repeat setup step 2. It replaces this folder and leaves the game and MO2 alone. Then run `install-mods.ps1` again with the current phase. Check the version in `modlist.json` (SkyrimCoop entry) matches Josh's. It refreshes our own mods every run and only installs Nexus mods that aren't there yet.
 
 ## Troubleshooting
 

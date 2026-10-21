@@ -109,7 +109,7 @@ foreach ($m in $list.mods) {
             if (Test-Path $dest) { Remove-Item -LiteralPath $dest -Recurse -Force }
             Copy-Item $src $dest -Recurse
             Write-Text "$dest\meta.ini" "[General]`r`ngameName=SkyrimSE`r`nversion=$($m.version)`r`n"
-        } elseif ($enabled) { $missing += "$($m.name): our own build, ask Josh for the latest SkyrimCoop zip" }
+        } elseif ($enabled) { $missing += "$($m.name): our own build, get the kit from https://github.com/jbillitt/skyrim-coop/releases/latest" }
         continue
     }
 
