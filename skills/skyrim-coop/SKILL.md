@@ -47,6 +47,18 @@ Everything here mirrors Josh's machine. The mod list and installer in this folde
 5. **Launch:** open `C:\Games\SkyrimCoop\MO2\ModOrganizer.exe`, choose **Skyrim Together** in the executable dropdown, then **Run**. Always launch through MO2, never through Steam. If MO2 shows its first-run wizard anyway, choose Portable → Skyrim Special Edition → Steam and keep the defaults; the installer's settings survive it. If it offers to handle Nexus links, that's optional.
 6. **Later phases:** after a good co-op test, re-run with `-Phase 2`, and later `-Phase 3`.
 
+### Solo profile (optional)
+
+For single-player with the same mods minus co-op:
+```powershell
+& "$env:USERPROFILE\.claude\skills\skyrim-coop\scripts\install-mods.ps1" -Profile Solo -Phase 3
+```
+In MO2, pick the **Solo** profile and launch with **SKSE**, not Skyrim Together.
+- **Off in Solo:** STR, our patch, the probe, Engine Fixes and Community Shaders.
+- **On in Solo:** Alternate Start (skips Helgen; needs USSEP, which is phase 3).
+- **Saves:** Solo keeps its own, separate from co-op.
+- **Starting a run:** pick any Alternate Start option ("camping in the woods" is quickest). Then cast Stats On Kill's **Setup** power, which wipes your inventory and resets stats on purpose. Then cast **Teleport** for a random spawn. Teleport is reusable at any time.
+
 ### Skyland AIO (phase 2, optional, per player)
 
 It's textures only, so it doesn't need to match Josh's.

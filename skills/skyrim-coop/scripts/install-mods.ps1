@@ -3,10 +3,12 @@ Sets up (or updates) the portable MO2 co-op instance from modlist.json. Safe to 
   -Phase 1|2|3   enable mods up to this phase (others stay installed but off)
   -NoProbe       leave the test plugin off
   -LocalMods     folder holding our own built mods (SkyrimCoop, SkyrimCoopProbe)
+  -Profile       Default (co-op) or Solo (no STR, own saves); mods opt out with "coop": false / "solo": false
 Exit code 2 means some archives still need downloading; the missing list prints with Nexus links.
 #>
 param(
     [ValidateRange(1, 3)][int]$Phase = 1,
+    [ValidateSet('Default', 'Solo')][string]$Profile = 'Default',
     [switch]$NoProbe,
     [string]$Root = 'C:\Games\SkyrimCoop',
     [string]$LocalMods = (Join-Path $PSScriptRoot '..\mods'),
@@ -15,7 +17,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $list = Get-Content -Raw (Join-Path $PSScriptRoot '..\modlist.json') | ConvertFrom-Json
 $mo = Join-Path $Root 'MO2'
-$profileDir = Join-Path $mo 'profiles\Default'
+$profileDir = Join-Path $mo "profiles\$Profile"
+$solo = $Profile -eq 'Solo'
 $rootLog = Join-Path $Root 'game-root-files.txt'
 $tmp = Join-Path $Root '_extract'
 
@@ -61,7 +64,7 @@ if (-not (Test-Path "$mo\ModOrganizer.exe")) {
     "Installed MO2 $($list.mo2.version)"
 }
 Write-Text "$mo\portable.txt" ''
-foreach ($d in 'mods', 'downloads', 'overwrite', 'profiles\Default') { New-Item -ItemType Directory -Force (Join-Path $mo $d) | Out-Null }
+foreach ($d in 'mods', 'downloads', 'overwrite', "profiles\$Profile") { New-Item -ItemType Directory -Force (Join-Path $mo $d) | Out-Null }
 $g = $game -replace '\\', '/'
 $strDir = "$($mo -replace '\\', '/')/mods/Skyrim Together Reborn/SkyrimTogetherReborn"
 if (-not (Test-Path "$mo\ModOrganizer.ini")) {
@@ -79,7 +82,9 @@ if (-not (Test-Path "$mo\ModOrganizer.ini")) {
 }
 
 # --- profile: local inis copied from the game's, with Papyrus logging on for the probe ---
-Write-Text "$profileDir\settings.ini" "[General]`r`nLocalSaves=false`r`nLocalSettings=true`r`nAutomaticArchiveInvalidation=false`r`n"
+# Solo keeps its own saves so co-op characters never load without STR
+Write-Text "$profileDir\settings.ini" "[General]`r`nLocalSaves=$($solo.ToString().ToLower())`r`nLocalSettings=true`r`nAutomaticArchiveInvalidation=false`r`n"
+if ($solo) { New-Item -ItemType Directory -Force "$profileDir\saves" | Out-Null }
 foreach ($f in 'Skyrim.ini', 'SkyrimPrefs.ini', 'SkyrimCustom.ini') {
     $dest = Join-Path $profileDir $f.ToLower()
     if (-not (Test-Path $dest)) {
@@ -99,7 +104,8 @@ Write-Text $skyIni $t
 $missing = @()
 $logged = @(if (Test-Path $rootLog) { Get-Content $rootLog })
 foreach ($m in $list.mods) {
-    $enabled = $m.phase -le $Phase -and -not ($m.testOnly -and $NoProbe)
+    $inProfile = if ($solo) { $m.solo -ne $false } else { $m.coop -ne $false }
+    $enabled = $inProfile -and $m.phase -le $Phase -and -not ($m.testOnly -and $NoProbe)
     $dest = Join-Path $mo "mods\$($m.name)"
     $m | Add-Member -NotePropertyName enabled -NotePropertyValue $enabled -Force
 
