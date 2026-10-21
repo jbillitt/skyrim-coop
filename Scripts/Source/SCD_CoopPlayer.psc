@@ -13,6 +13,8 @@ ReferenceAlias Property Reward Auto
 ObjectReference[] Property Towns Auto
 Location[] Property TownHolds Auto
 WorldSpace[] Property TownWorlds Auto
+; Survival Mode's carry weight ability, zeroed by our plugin
+Spell Property SurvivalCarry Auto
 
 Int Property KindDown = 0 AutoReadOnly
 Int Property KindUp = 1 AutoReadOnly
@@ -62,6 +64,12 @@ Function Setup()
 	victimTimes = new Float[4]
 	pendingCredits = 0
 	RegisterForControl("Activate")
+	Actor player = GetActorReference()
+	If player.HasSpell(SurvivalCarry)
+		; saves keep the old -150 until the ability is reapplied
+		player.RemoveSpell(SurvivalCarry)
+		player.AddSpell(SurvivalCarry, False)
+	EndIf
 	If !Marker.IsRunning()
 		Marker.Start()
 		Marker.SetObjectiveDisplayed(10)

@@ -15,6 +15,8 @@ var playerFaction = FormKey.Factory("000DB1:Skyrim.esm");
 var magicRestoreHealth = FormKey.Factory("01CEB0:Skyrim.esm");
 var killActorBranch = FormKey.Factory("013010:Skyrim.esm");
 var sokQuest = FormKey.Factory("000D62:StatsOnKill.esp");
+// Survival Mode's -150 carry weight; with Stats On Kill's 10 base it pins you overencumbered
+var survivalCarry = FormKey.Factory("000887:ccQDRSSE001-SurvivalMode.esl");
 var tamriel = "00003C:Skyrim.esm";
 var solstheim = "000800:Dragonborn.esm";
 
@@ -42,7 +44,7 @@ var solstheim = "000800:Dragonborn.esm";
     ("0143E2:Dragonborn.esm", "016E2A:Dragonborn.esm", solstheim), // Skaal Village
 ];
 
-var loadOrder = new[] { "Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm", "StatsOnKill.esp" }
+var loadOrder = new[] { "Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm", "ccQDRSSE001-SurvivalMode.esl", "StatsOnKill.esp" }
     .Select(n => ModKey.FromFileName(n)).ToArray();
 
 var mod = new SkyrimMod(ModKey.FromFileName("SkyrimCoop.esp"), SkyrimRelease.SkyrimSE);
@@ -122,6 +124,11 @@ for (var kind = 0; kind < signalNames.Length; kind++)
     signals.Add(spell.FormKey);
 }
 
+var survival = SkyrimMod.CreateFromBinaryOverlay(Path.Combine(gameData, "ccQDRSSE001-SurvivalMode.esl"), SkyrimRelease.SkyrimSE);
+var carrySpell = survival.Spells[survivalCarry].DeepCopy();
+carrySpell.Effects[0].Data!.Magnitude = 0;
+mod.Spells.Add(carrySpell);
+
 // Stats On Kill's reward script, configured exactly like its own victim alias
 var sok = SkyrimMod.CreateFromBinaryOverlay(sokPath, SkyrimRelease.SkyrimSE);
 var sokScript = sok.Quests[sokQuest].VirtualMachineAdapter!.Aliases.Single().Scripts.Single(s => s.Name == "neth_StatsOnKillScript");
@@ -152,6 +159,7 @@ main.VirtualMachineAdapter = new QuestAdapter
                         Objs("Towns", towns.Select(t => FormKey.Factory(t.Marker))),
                         Objs("TownHolds", towns.Select(t => FormKey.Factory(t.Hold))),
                         Objs("TownWorlds", towns.Select(t => FormKey.Factory(t.World))),
+                        Obj("SurvivalCarry", survivalCarry),
                     },
                 },
             },
