@@ -4,10 +4,11 @@ SCD_Signal spells, because STR forwards a healing-keyword spell cast on a remote
 
 Quest Property Finder Auto
 ReferenceAlias Property FoundPartner Auto
-Quest Property Marker Auto ; puts a compass marker on a downed partner
+Quest Property Marker Auto ; compass marker on the partner; objective 20 while they are down
 ReferenceAlias Property MarkerTarget Auto
 Spell[] Property Signals Auto ; indexed by SCD_SignalEffect.Kind
-SCD_RewardAlias Property Reward Auto
+; a script-typed alias property fails to bind ("not the right type"), so it is cast at use
+ReferenceAlias Property Reward Auto
 ; capitals first, so an interior resolves to its hold's capital
 ObjectReference[] Property Towns Auto
 Location[] Property TownHolds Auto
@@ -31,7 +32,7 @@ Bool downed
 Float downedAt
 Float lastDownSignal
 Float nextNotice
-Bool markerShown
+Float nextLookup
 Float partnerDownUntil
 Float wipedAt = -100.0
 Float holdStart = -1.0
@@ -52,7 +53,7 @@ Event OnPlayerLoadGame()
 	holdStart = -1.0
 	downedAt = Now()
 	nextNotice = 20.0
-	HideMarker()
+	nextLookup = 0.0
 	Setup()
 EndEvent
 
@@ -61,9 +62,12 @@ Function Setup()
 	victimTimes = new Float[4]
 	pendingCredits = 0
 	RegisterForControl("Activate")
-	If downed
-		RegisterForSingleUpdate(1.0)
+	If !Marker.IsRunning()
+		Marker.Start()
+		Marker.SetObjectiveDisplayed(10)
+		Marker.SetActive()
 	EndIf
+	RegisterForSingleUpdate(1.0)
 EndFunction
 
 Float Function Now()
@@ -81,7 +85,8 @@ Event OnEnterBleedout()
 	downedAt = Now()
 	nextNotice = 20.0
 	Debug.Trace("SCD: downed, partner=" + Partner() + " partnerDown=" + PartnerDown())
-	If !Partner() || PartnerDown()
+	; an unseen partner is far away, not down, so only a known-down partner means a wipe
+	If PartnerDown()
 		Wipe()
 		Return
 	EndIf
@@ -114,23 +119,23 @@ Event OnUpdate()
 			EndIf
 		EndIf
 	EndIf
-	If markerShown && !PartnerDown()
-		HideMarker()
-	EndIf
+	RefreshMarker()
 	If holdStart >= 0.0 && t - holdStart >= ReviveHoldSecs
 		holdStart = -1.0
 		If PartnerDown() && PartnerInReach()
 			Send(KindRevive)
 			partnerDownUntil = 0.0
-			HideMarker()
+			RefreshMarker()
 			Debug.Notification("You got your partner back up.")
 		EndIf
 	EndIf
 	If pendingCredits > 0
 		PayCredits()
 	EndIf
-	If downed || holdStart >= 0.0 || pendingCredits > 0 || markerShown
+	If downed || holdStart >= 0.0 || pendingCredits > 0 || PartnerDown()
 		RegisterForSingleUpdate(0.5)
+	Else
+		RegisterForSingleUpdate(1.0)
 	EndIf
 EndEvent
 
@@ -168,7 +173,6 @@ Function Wipe()
 	downed = False
 	wipedAt = Now()
 	partnerDownUntil = 0.0
-	HideMarker()
 	Debug.Trace("SCD: party wipe")
 	; a downed partner's PC wipes too when it hears this
 	Send(KindDown)
@@ -238,6 +242,7 @@ Actor Function Partner()
 	EndWhile
 	Finder.Start()
 	partner = FoundPartner.GetActorReference()
+	Debug.Trace("SCD: finder found " + partner + " remote=" + (partner && SkyrimTogetherUtils.IsRemotePlayer(partner)))
 	If partner && !SkyrimTogetherUtils.IsRemotePlayer(partner)
 		partner = None
 	EndIf
@@ -279,15 +284,14 @@ Function OnSignal(Int kind, Actor sender)
 		If downed
 			Wipe()
 		Else
-			; refreshed on every re-signal, in case STR swapped the stand-in
-			ShowMarker(Partner())
+			RefreshMarker()
 			If !wasDown
 				Debug.Notification("Your partner is down! Follow the marker and hold E next to them.")
 			EndIf
 		EndIf
 	ElseIf kind == KindUp
 		partnerDownUntil = 0.0
-		HideMarker()
+		RefreshMarker()
 	ElseIf kind == KindRevive
 		GetUp(0.5, "Your partner got you back up.")
 	ElseIf kind == KindCredit
@@ -300,28 +304,24 @@ Function OnSignal(Int kind, Actor sender)
 	EndIf
 EndFunction
 
-Function ShowMarker(Actor p)
-	If !p
-		Return
-	EndIf
-	If !markerShown
-		markerShown = True
-		Marker.Start()
-		MarkerTarget.ForceRefTo(p)
-		Marker.SetObjectiveDisplayed(10)
-		Marker.SetActive()
+Function RefreshMarker()
+	Actor p = partner
+	; a missing partner costs a finder restart, so look again only every few seconds
+	If (p && p.Is3DLoaded()) || PartnerDown() || Now() >= nextLookup
+		p = Partner()
+		If !p
+			nextLookup = Now() + 5.0
+		EndIf
 	Else
+		p = None
+	EndIf
+	If p
+		; re-forced each tick, in case STR swapped the stand-in
 		MarkerTarget.ForceRefTo(p)
+	Else
+		MarkerTarget.Clear()
 	EndIf
-	RegisterForSingleUpdate(0.5)
-EndFunction
-
-Function HideMarker()
-	If markerShown
-		markerShown = False
-		Marker.SetObjectiveDisplayed(10, False)
-		Marker.Stop()
-	EndIf
+	Marker.SetObjectiveDisplayed(20, p && PartnerDown())
 EndFunction
 
 ; --- shared kill credit ---
@@ -350,7 +350,7 @@ Function PayCredits()
 			victim = GetActorReference()
 		EndIf
 		pendingCredits -= 1
-		Reward.Pay(victim)
+		(Reward as SCD_RewardAlias).Pay(victim)
 	EndWhile
 EndFunction
 

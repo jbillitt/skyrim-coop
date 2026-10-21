@@ -85,14 +85,15 @@ foreach (var npc in esm.Npcs.Where(n => n.Factions.Any(f => f.Faction.FormKey ==
 finder.Aliases.Add(partnerAlias);
 finder.NextAliasID = 1;
 
-// Compass/map marker on a downed partner
+// Compass/map marker on the partner, with a second objective while they are down
 var marker = mod.Quests.AddNew("SCD_PartnerDownQuest");
-marker.Name = "Partner down";
+marker.Name = "Co-op";
 marker.Type = Quest.TypeEnum.Misc;
 marker.Priority = 50;
-marker.Aliases.Add(new QuestAlias { ID = 0, Name = "DownedPartner", Flags = QuestAlias.Flag.Optional | QuestAlias.Flag.AllowReserved });
+marker.Aliases.Add(new QuestAlias { ID = 0, Name = "Partner", Flags = QuestAlias.Flag.Optional | QuestAlias.Flag.AllowReserved });
 marker.NextAliasID = 1;
-marker.Objectives.Add(new QuestObjective { Index = 10, DisplayText = "Help your partner up", Targets = { new QuestObjectiveTarget { AliasID = 0 } } });
+marker.Objectives.Add(new QuestObjective { Index = 10, DisplayText = "Your partner", Targets = { new QuestObjectiveTarget { AliasID = 0 } } });
+marker.Objectives.Add(new QuestObjective { Index = 20, DisplayText = "Help your partner up", Targets = { new QuestObjectiveTarget { AliasID = 0 } } });
 
 string[] signalNames =["Down", "Up", "Revive", "Credit"]; // index = SCD_SignalEffect.Kind
 var signals = new List<FormKey>();
