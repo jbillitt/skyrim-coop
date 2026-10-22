@@ -287,11 +287,15 @@ Function Wipe(String why)
 	; PC, so teleporting straight away parked it there until we next came back; give it time to land
 	Send(KindWipe)
 	Utility.Wait(2.0)
-	StandUp(1.0)
 	Actor player = GetActorReference()
 	; the fight (or a guard chase) shouldn't follow us into town; any bounty stays
 	player.StopCombatAlarm()
+	; standing up takes a moment (it signals the partner); on Legendary one hit in that gap put Jesse
+	; back down, and MoveTo refuses a downed player ("they are dead")
+	player.SetGhost(True)
+	StandUp(1.0)
 	player.MoveTo(NearestTown())
+	player.SetGhost(False)
 	reequipAt = Now() + 3.0
 	poseResetAt = Now() + 4.0
 	String place = "the nearest town"
