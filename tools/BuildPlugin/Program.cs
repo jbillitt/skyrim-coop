@@ -139,6 +139,15 @@ var carrySpell = survival.Spells[survivalCarry].DeepCopy();
 carrySpell.Effects[0].Data!.Magnitude = 0;
 mod.Spells.Add(carrySpell);
 
+// Survival's hunger, tiredness and cold pulses blur the screen, which made him feel sick; keep the tint, drop the blur
+foreach (var imad in survival.ImageSpaceAdapters)
+{
+    var calm = imad.DeepCopy();
+    foreach (var frames in new[] { calm.BlurRadius, calm.DepthOfFieldStrength, calm.RadialBlurStrength })
+        foreach (var frame in frames ?? [])
+            frame.Value = 0;
+    mod.ImageSpaceAdapters.Add(calm);
+}
 // Stats On Kill's reward script, configured exactly like its own victim alias
 var sok = SkyrimMod.CreateFromBinaryOverlay(sokPath, SkyrimRelease.SkyrimSE);
 var sokScript = sok.Quests[sokQuest].VirtualMachineAdapter!.Aliases.Single().Scripts.Single(s => s.Name == "neth_StatsOnKillScript");
