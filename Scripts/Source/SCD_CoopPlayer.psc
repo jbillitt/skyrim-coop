@@ -57,6 +57,7 @@ Float nextLookup
 Float wipedAt = -100.0
 Float helpStart = -1.0
 Float aloneSince = -1.0
+Actor lastAttacker
 ; when to snap our player / the partner's stand-in back to the default pose
 Float poseResetAt = -1.0
 Float standInResetAt = -1.0
@@ -136,6 +137,10 @@ Event OnEnterBleedout()
 	player.SetNoBleedoutRecovery(True)
 	downed = True
 	aloneSince = -1.0
+	; beaten by the law or the townsfolk: they stop there, the bounty stays
+	If lastAttacker && lastAttacker.GetCrimeFaction()
+		player.StopCombatAlarm()
+	EndIf
 	Debug.Trace("SCD: downed, partner=" + Partner() + " partnerDown=" + partnerIsDown)
 	If partnerIsDown
 		Wipe("Your party was wiped out.")
@@ -145,6 +150,13 @@ Event OnEnterBleedout()
 	Debug.Notification("You're down! Your partner has to crouch next to you to get you up.")
 	Debug.Notification("Somewhere they can't reach? Hold E for 5 seconds.")
 	RegisterForSingleUpdate(0.5)
+EndEvent
+
+Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile, Bool abPowerAttack, Bool abSneakAttack, Bool abBashAttack, Bool abHitBlocked)
+	Actor attacker = akAggressor as Actor
+	If attacker
+		lastAttacker = attacker
+	EndIf
 EndEvent
 
 Event OnUpdate()
