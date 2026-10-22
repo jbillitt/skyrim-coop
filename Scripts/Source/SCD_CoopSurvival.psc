@@ -1,11 +1,9 @@
 Scriptname SCD_CoopSurvival extends ReferenceAlias
 {On the player: Survival Mode fixes for co-op. Sleep gets its hours credited (STR locks the game clock while
-connected, so sleep passes no game time and Survival rests you for ~0 hours), hunger rises at half rate, and
-an owned bed can be slept in while the partner is in the same cell (a room rented on one PC is still the
+connected, so sleep passes no game time and Survival rests you for ~0 hours), and an owned bed can be slept in while the partner is in the same cell (a room rented on one PC is still the
 innkeeper's on the other).}
 
 String Property SurvivalFile = "ccQDRSSE001-SurvivalMode.esl" AutoReadOnly
-Float Property HungerRate = 3.75 AutoReadOnly ; Survival's default is 7.5 per quarter game hour
 
 Float sleepStart
 Float sleepEnd
@@ -25,7 +23,6 @@ EndEvent
 Function Setup()
 	RegisterForSleep()
 	RegisterForCrosshairRef()
-	(Game.GetFormFromFile(0x829, SurvivalFile) as GlobalVariable).SetValue(HungerRate)
 EndFunction
 
 Event OnSleepStart(Float afSleepStartTime, Float afDesiredSleepEndTime)

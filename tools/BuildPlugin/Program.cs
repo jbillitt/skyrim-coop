@@ -148,6 +148,15 @@ foreach (var imad in survival.ImageSpaceAdapters)
             frame.Value = 0;
     mod.ImageSpaceAdapters.Add(calm);
 }
+// STR re-applies every effect on a player to their stand-in on the other PC, where Survival's effect scripts
+// (screen tints, cold regions, disease messages) then act for that PC's own player. Survival limits only its
+// food effects to the player; do the same for the rest. Prepended so it ANDs with any OR group already there.
+foreach (var effect in survival.MagicEffects.Where(e => e.VirtualMachineAdapter is not null))
+{
+    var mine = effect.DeepCopy();
+    mine.Conditions.Insert(0, Cond(new GetIsReferenceConditionData(), Constants.Player.FormKey, 1));
+    mod.MagicEffects.Add(mine);
+}
 // Stats On Kill's reward script, configured exactly like its own victim alias
 var sok = SkyrimMod.CreateFromBinaryOverlay(sokPath, SkyrimRelease.SkyrimSE);
 var sokScript = sok.Quests[sokQuest].VirtualMachineAdapter!.Aliases.Single().Scripts.Single(s => s.Name == "neth_StatsOnKillScript");
@@ -222,6 +231,7 @@ ConditionFloat Cond(ConditionData data, FormKey target, float value)
     {
         case GetIsIDConditionData d: d.Object.Link.SetTo(target); break;
         case GetInFactionConditionData d: d.Faction.Link.SetTo(target); break;
+        case GetIsReferenceConditionData d: d.Target.Link.SetTo(target); break;
         default: throw new ArgumentException(data.GetType().Name);
     }
     return new ConditionFloat { Data = data, ComparisonValue = value, CompareOperator = CompareOperator.EqualTo };
