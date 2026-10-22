@@ -273,6 +273,8 @@ Function Wipe(String why)
 	Send(KindWipe)
 	StandUp(1.0)
 	Actor player = GetActorReference()
+	; the fight (or a guard chase) shouldn't follow us into town; any bounty stays
+	player.StopCombatAlarm()
 	player.MoveTo(NearestTown())
 	reequipAt = Now() + 3.0
 	poseResetAt = Now() + 4.0
