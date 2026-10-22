@@ -513,8 +513,10 @@ Function RefreshMarker()
 	EndIf
 	If p && p != lastSeen
 		Debug.Trace("SCD: partner is " + p)
-		; a fresh stand-in for the partner usually means they got a fresh one of us too
+		; a fresh stand-in for the partner usually means they got a fresh one of us too, and it can
+		; arrive in a broken pose (half in the floor, arms bent back)
 		reequipAt = Now() + 2.0
+		standInResetAt = Now() + 2.0
 	EndIf
 	lastSeen = p
 	If p

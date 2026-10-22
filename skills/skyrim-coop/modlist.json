@@ -10,7 +10,7 @@
       "gameData": ["SkyrimTogetherReborn"], "note": "STR looks for its UI helper (TPProcess.exe) in the real Data folder; through MO2 alone it falls back to starting a second, plain SkyrimSE.exe" },
     { "name": "Stats On Kill", "modId": 183621, "fileId": 770641, "version": "1.0.2", "match": "StatsOnKill", "include": ["StatsOnKill"],
       "plugins": ["StatsOnKill.esp"], "phase": 1 },
-    { "name": "SkyrimCoop", "local": true, "solo": false, "version": "0.12", "plugins": ["SkyrimCoop.esp"], "phase": 1 },
+    { "name": "SkyrimCoop", "local": true, "solo": false, "version": "0.13", "plugins": ["SkyrimCoop.esp"], "phase": 1 },
     { "name": "SkyrimCoopProbe", "local": true, "solo": false, "coop": false, "version": "0.1", "plugins": ["SkyrimCoopProbe.esp"], "phase": 1, "retired": true },
 
     { "name": "Alternate Start - Live Another Life", "modId": 272, "fileId": 729409, "version": "4.2.6a", "match": "Alternate Start - Live Another Life", "include": ["."],
