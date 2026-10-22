@@ -370,6 +370,16 @@ Function ResetPose(Actor a)
 	If a.IsBleedingOut() || a.GetSitState() != 0
 		Return
 	EndIf
+	; forced to the default state with weapons or fists out, the player's own PC can't attack again until
+	; they re-equip (the partner's screen still shows the attacks); put them away first
+	If a == GetActorReference() && a.IsWeaponDrawn()
+		a.SheatheWeapon()
+		Int tries = 0
+		While a.IsWeaponDrawn() && tries < 20
+			Utility.Wait(0.1)
+			tries += 1
+		EndWhile
+	EndIf
 	Debug.SendAnimationEvent(a, "IdleForceDefaultState")
 EndFunction
 
