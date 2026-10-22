@@ -49,6 +49,8 @@ Bool downed
 Bool partnerIsDown
 ; we stood the partner's stand-in up and it hasn't finished getting up yet
 Bool standInRecovering
+; it counts as down again if still bleeding out after this (a quick second down looked like the first)
+Float recoverUntil
 Float downX
 Float downY
 Float callStart = -1.0
@@ -281,8 +283,10 @@ Function Wipe(String why)
 	wipedAt = Now()
 	partnerIsDown = False
 	Debug.Trace("SCD: wipe: " + why)
-	; sent before the teleport takes us out of the partner's reach; a downed partner wipes on hearing it
+	; a downed partner wipes on hearing it. STR holds a signal until its caster exists on the partner's
+	; PC, so teleporting straight away parked it there until we next came back; give it time to land
 	Send(KindWipe)
+	Utility.Wait(2.0)
 	StandUp(1.0)
 	Actor player = GetActorReference()
 	; the fight (or a guard chase) shouldn't follow us into town; any bounty stays
@@ -430,6 +434,7 @@ Function PartnerUp(Actor p)
 	partnerIsDown = False
 	If p
 		standInRecovering = True
+		recoverUntil = Now() + 5.0
 		p.SetNoBleedoutRecovery(False)
 		p.RestoreActorValue("Health", p.GetActorValueMax("Health"))
 		standInResetAt = Now() + 2.0
@@ -572,7 +577,7 @@ Function RefreshMarker()
 			If dx * dx + dy * dy > MovedRange * MovedRange
 				PartnerUp(p)
 			EndIf
-		ElseIf standInRecovering
+		ElseIf standInRecovering && Now() < recoverUntil
 			standInRecovering = p.IsBleedingOut()
 		ElseIf p.IsBleedingOut()
 			PartnerWentDown(p)
