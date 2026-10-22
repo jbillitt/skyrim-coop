@@ -331,6 +331,7 @@ ObjectReference Function NearestTown()
 	While world && i < Towns.Length
 		If TownWorlds[i] == world && TownFound[i].CanFastTravelToMarker()
 			Float d = player.GetDistance(Towns[i])
+			Debug.Trace("SCD: wipe candidate " + Towns[i].GetDisplayName() + " " + (d as Int))
 			If !best || d < bestDist
 				best = Towns[i]
 				bestDist = d
