@@ -38,7 +38,7 @@ if (-not (Test-Path "$deps\str\SkyrimTogetherUtils.psc")) {
 }
 
 $vanilla = "$deps\vanilla\Source\Scripts"
-$imports = @($StatsOnKillSource, "$deps\str", "$($skseSrc.FullName)\Data\Scripts\Source", $vanilla)
+$imports = @($StatsOnKillSource, "$root\Scripts\Stubs", "$deps\str", "$($skseSrc.FullName)\Data\Scripts\Source", $vanilla)
 
 function Compile($sourceDir, $outDir) {
     New-Item -ItemType Directory -Force $outDir | Out-Null

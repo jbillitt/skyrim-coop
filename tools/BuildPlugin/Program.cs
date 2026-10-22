@@ -186,6 +186,7 @@ main.VirtualMachineAdapter = new QuestAdapter
                     },
                 },
                 new ScriptEntry { Name = "SCD_ContainerEat" },
+                new ScriptEntry { Name = "SCD_CoopSurvival" },
             },
         },
         new QuestFragmentAlias
