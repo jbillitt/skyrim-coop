@@ -40,6 +40,8 @@ Float Property ReviveRange = 400.0 AutoReadOnly
 ; a downed player can't walk, so a stand-in that moves this far is up
 Float Property MovedRange = 150.0 AutoReadOnly
 Float Property VictimTtl = 5.0 AutoReadOnly
+; down with no partner anywhere near this long: wipe (rides out STR swapping their stand-in)
+Float Property AloneSecs = 10.0 AutoReadOnly
 Float Property CreditWait = 3.0 AutoReadOnly
 
 Actor partner
@@ -54,6 +56,7 @@ Float upAt = -100.0
 Float nextLookup
 Float wipedAt = -100.0
 Float helpStart = -1.0
+Float aloneSince = -1.0
 ; when to snap our player / the partner's stand-in back to the default pose
 Float poseResetAt = -1.0
 Float standInResetAt = -1.0
@@ -76,6 +79,7 @@ Event OnPlayerLoadGame()
 	standInRecovering = False
 	wipedAt = -100.0
 	helpStart = -1.0
+	aloneSince = -1.0
 	callStart = -1.0
 	upAt = -100.0
 	nextLookup = 0.0
@@ -131,6 +135,7 @@ Event OnEnterBleedout()
 	EndIf
 	player.SetNoBleedoutRecovery(True)
 	downed = True
+	aloneSince = -1.0
 	Debug.Trace("SCD: downed, partner=" + Partner() + " partnerDown=" + partnerIsDown)
 	If partnerIsDown
 		Wipe("Your party was wiped out.")
@@ -189,6 +194,16 @@ EndEvent
 ; downed player's own PC watches for them crouching close by
 Function WatchForHelp(Float t)
 	Actor p = Partner()
+	; a partner who wiped teleports away, and their wipe signal can go missing; with nobody here
+	; to help, this is a wipe too
+	If p
+		aloneSince = -1.0
+	ElseIf aloneSince < 0.0
+		aloneSince = t
+	ElseIf t - aloneSince >= AloneSecs
+		Wipe("Nobody could reach you.")
+		Return
+	EndIf
 	If !(p && p.IsSneaking() && GetActorReference().GetDistance(p) <= ReviveRange)
 		helpStart = -1.0
 	ElseIf helpStart < 0.0
@@ -376,6 +391,11 @@ Function PartnerWentDown(Actor p)
 		downY = p.GetPositionY()
 	EndIf
 	Debug.Trace("SCD: partner down")
+	; seen from their stand-in rather than signalled, this is our only cue that both of us are down
+	If downed
+		Wipe("Your party was wiped out.")
+		Return
+	EndIf
 	Debug.Notification("Your partner is down! Follow the marker and crouch next to them.")
 	RegisterForSingleUpdate(0.5)
 EndFunction
