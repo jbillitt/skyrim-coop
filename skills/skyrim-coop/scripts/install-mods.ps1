@@ -54,21 +54,22 @@ function Install-Fomod($archive, $dest, $choices) {
     $base = Split-Path (Split-Path $config.FullName)
     [xml]$x = Get-Content -LiteralPath $config.FullName
     New-Item -ItemType Directory $dest | Out-Null
+    $items = @($x.SelectNodes('//requiredInstallFiles/*'))
     foreach ($g in $x.SelectNodes('//installStep/optionalFileGroups/group')) {
         $picked = $choices.($g.name)
         foreach ($p in $g.plugins.plugin) {
-            if ($picked -notcontains $p.name) { continue }
-            foreach ($item in $p.files.ChildNodes) {
-                $src = Join-Path $base $item.source
-                $to = Join-Path $dest $item.destination
-                if ($item.LocalName -eq 'folder') {
-                    New-Item -ItemType Directory -Force $to | Out-Null
-                    Copy-Item -Path (Join-Path $src '*') -Destination $to -Recurse -Force
-                } else {
-                    New-Item -ItemType Directory -Force (Split-Path $to) | Out-Null
-                    Copy-Item -LiteralPath $src $to -Force
-                }
-            }
+            if ($picked -contains $p.name) { $items += @($p.files.ChildNodes) }
+        }
+    }
+    foreach ($item in $items) {
+        $src = Join-Path $base $item.source
+        $to = Join-Path $dest $item.destination
+        if ($item.LocalName -eq 'folder') {
+            New-Item -ItemType Directory -Force $to | Out-Null
+            Copy-Item -Path (Join-Path $src '*') -Destination $to -Recurse -Force
+        } else {
+            New-Item -ItemType Directory -Force (Split-Path $to) | Out-Null
+            Copy-Item -LiteralPath $src $to -Force
         }
     }
     Remove-Item -LiteralPath $tmp -Recurse -Force
