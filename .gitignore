@@ -3,3 +3,4 @@ dist/
 bin/
 obj/
 __pycache__/
+.claude/settings.local.json
