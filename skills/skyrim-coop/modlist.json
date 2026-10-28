@@ -15,6 +15,8 @@
 
     { "name": "Alternate Start - Live Another Life", "modId": 272, "fileId": 729409, "version": "4.2.6a", "match": "Alternate Start - Live Another Life", "include": ["."],
       "plugins": ["alternate start - live another life.esp"], "phase": 1, "note": "Skips the Helgen intro; start, then connect. Needs USSEP." },
+    { "name": "Wood Frame Backpacks", "modId": 23676, "fileId": 82779, "version": "1.0", "match": "Wiid Frame Backpacks", "include": ["data"],
+      "plugins": ["Wooden Frame Packs.esp"], "phase": 1, "note": "Five backpacks crafted at the tanning rack (Leather), +50 carry weight. Shares the back slot with cloak mods. The archive name really is misspelt 'Wiid'." },
 
     { "name": "SkyUI", "modId": 12604, "fileId": 749043, "version": "6.11", "match": "^SkyUI-12604", "include": ["."], "plugins": ["SkyUI_SE.esp"], "phase": 2 },
     { "name": "SSE Engine Fixes", "solo": false, "coop": false, "modId": 17230, "fileId": 725753, "version": "7.0.20", "match": "Engine Fixes - Main File",
