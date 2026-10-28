@@ -5,7 +5,9 @@ param(
     [string]$SkseArchive = "$env:USERPROFILE\Downloads\Skyrim Script Extender (SKSE64) Steam 30379 2.3.1 2026-08-27T16-52Z s6Og0dG94.7z",
     [string]$StatsOnKillEsp = 'C:\Games\SkyrimCoop\_installers\StatsOnKill\StatsOnKill\StatsOnKill.esp',
     # SCD_RewardAlias extends Stats On Kill's script; compiled against only, never shipped
-    [string]$StatsOnKillSource = 'C:\Games\SkyrimCoop\_installers\StatsOnKill\source'
+    [string]$StatsOnKillSource = 'C:\Games\SkyrimCoop\_installers\StatsOnKill\source',
+    # master of SkyrimCoop - Encounters.esp; install-mods.ps1 puts it here
+    [string]$ExtendedEncountersEsp = 'C:\Games\SkyrimCoop\MO2\mods\Extended Encounters\Extended Encounters.esp'
 )
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
@@ -16,6 +18,7 @@ function Need($path, $what) { if (-not (Test-Path $path)) { throw "Missing $what
 Need "$Game\Papyrus Compiler\PapyrusCompiler.exe" 'Papyrus compiler (install the Creation Kit)'
 Need $StatsOnKillEsp 'StatsOnKill.esp'
 Need "$StatsOnKillSource\neth_StatsOnKillScript.psc" 'Stats On Kill script sources'
+Need $ExtendedEncountersEsp 'Extended Encounters.esp (run install-mods.ps1 first)'
 
 # Script sources we compile against; extracted once, never into the game folder
 if (-not (Test-Path "$deps\vanilla\Source\Scripts\Actor.psc")) {
@@ -49,7 +52,7 @@ function Compile($sourceDir, $outDir) {
 
 Compile "$root\Scripts\Source" "$dist\SkyrimCoop\Scripts"
 
-dotnet run --project "$root\tools\BuildPlugin" -c Release -- $StatsOnKillEsp "$Game\Data" $dist
+dotnet run --project "$root\tools\BuildPlugin" -c Release -- $StatsOnKillEsp "$Game\Data" $dist $ExtendedEncountersEsp
 if ($LASTEXITCODE) { throw 'Plugin generation failed' }
 
 Get-ChildItem $dist -Recurse -File | ForEach-Object { $_.FullName.Substring($dist.Length + 1) }

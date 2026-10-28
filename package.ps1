@@ -5,7 +5,7 @@ $stage = "$PSScriptRoot\dist\kit\skyrim-coop"
 if (Test-Path "$PSScriptRoot\dist\kit") { Remove-Item -LiteralPath "$PSScriptRoot\dist\kit" -Recurse -Force }
 Copy-Item "$PSScriptRoot\skills\skyrim-coop" $stage -Recurse
 New-Item -ItemType Directory "$stage\mods" | Out-Null
-foreach ($m in 'SkyrimCoop') { Copy-Item "$PSScriptRoot\dist\$m" "$stage\mods\$m" -Recurse }
+foreach ($m in 'SkyrimCoop', 'SkyrimCoop Encounters') { Copy-Item "$PSScriptRoot\dist\$m" "$stage\mods\$m" -Recurse }
 $zip = "$PSScriptRoot\dist\SkyrimCoop-kit.zip"
 if (Test-Path $zip) { Remove-Item -LiteralPath $zip }
 Compress-Archive -Path $stage -DestinationPath $zip

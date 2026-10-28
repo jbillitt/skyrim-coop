@@ -1,5 +1,5 @@
 // Generates SkyrimCoop.esp.
-// Usage: BuildPlugin <path to StatsOnKill.esp> <game Data dir> <dist dir>
+// Usage: BuildPlugin <path to StatsOnKill.esp> <game Data dir> <dist dir> [path to Extended Encounters.esp]
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Skyrim;
@@ -225,6 +225,40 @@ var path = Path.Combine(dir, mod.ModKey.FileName);
 mod.BeginWrite.ToPath(path).WithLoadOrder(loadOrder).WithNoDataFolder().Write();
 Console.WriteLine($"wrote {path}");
 
+// Extended Encounters: STR turns WEEnabled on only on the party leader's PC, and relays every quest start to the
+// partner, whose own copy of an encounter would spawn a second set of actors. A first alias that only fills while
+// WEEnabled is on stops the encounter starting on the partner's PC however it is started; the leader's actors sync over.
+if (args.Length > 3)
+{
+    var weEnabled = FormKey.Factory("0B8EC1:Skyrim.esm");
+    var ee = SkyrimMod.CreateFromBinaryOverlay(args[3], SkyrimRelease.SkyrimSE);
+    var patch = new SkyrimMod(ModKey.FromFileName("SkyrimCoop - Encounters.esp"), SkyrimRelease.SkyrimSE);
+    patch.ModHeader.Flags |= SkyrimModHeader.HeaderFlag.Small;
+    // start-game quests (MCM, timers) must keep running on both PCs
+    foreach (var q in ee.Quests.Where(q => q.FormKey.ModKey == ee.ModKey && !q.Flags.HasFlag(Quest.Flag.StartGameEnabled)))
+    {
+        var gated = q.DeepCopy();
+        var gate = new QuestAlias
+        {
+            ID = gated.Aliases.Select(a => a.ID + 1).Append(gated.NextAliasID ?? 0).Max(),
+            Name = "SCD_LeaderGate",
+            Flags = QuestAlias.Flag.MatchingRefInLoadedArea | QuestAlias.Flag.MatchingRefClosest | QuestAlias.Flag.AllowReserved,
+        };
+        gate.Conditions.Add(Cond(new GetGlobalValueConditionData(), weEnabled, 1));
+        // first, so it fails before any create-reference alias spawns an actor
+        gated.Aliases.Insert(0, gate);
+        gated.NextAliasID = gate.ID + 1;
+        patch.Quests.Add(gated);
+    }
+    var patchDir = Path.Combine(dist, "SkyrimCoop Encounters");
+    Directory.CreateDirectory(patchDir);
+    var patchPath = Path.Combine(patchDir, patch.ModKey.FileName);
+    var patchOrder = new[] { "Skyrim.esm", "Update.esm", "Dawnguard.esm", "Dragonborn.esm", Path.GetFileName(args[3]) }
+        .Select(n => ModKey.FromFileName(n)).ToArray();
+    patch.BeginWrite.ToPath(patchPath).WithLoadOrder(patchOrder).WithNoDataFolder().Write();
+    Console.WriteLine($"wrote {patchPath} ({patch.Quests.Count} encounter quests gated)");
+}
+
 ConditionFloat Cond(ConditionData data, FormKey target, float value)
 {
     switch (data)
@@ -232,6 +266,7 @@ ConditionFloat Cond(ConditionData data, FormKey target, float value)
         case GetIsIDConditionData d: d.Object.Link.SetTo(target); break;
         case GetInFactionConditionData d: d.Faction.Link.SetTo(target); break;
         case GetIsReferenceConditionData d: d.Target.Link.SetTo(target); break;
+        case GetGlobalValueConditionData d: d.Global.Link.SetTo(target); break;
         default: throw new ArgumentException(data.GetType().Name);
     }
     return new ConditionFloat { Data = data, ComparisonValue = value, CompareOperator = CompareOperator.EqualTo };

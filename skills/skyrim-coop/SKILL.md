@@ -74,7 +74,8 @@ Both players connect to the host's STR server and stand near each other, then:
 1. **Kill credit:** take turns killing an enemy. Both players should get Stats On Kill's stat pop-ups for every kill either of you lands, and nothing for kills by NPCs. The partner's pop-ups can lag the killer's by a second or two.
 2. **Revive:** one player gets knocked to 0 health. The other crouches right next to them for 3 seconds; the downed player should stand up. Then go down again and hold E for 5 seconds; you should be moved next to your partner, still down.
 3. **Wipe:** both players get downed together. Both should wake at the nearest discovered town, each 10% of their gold lighter.
-4. **Send Josh the logs:** zip and send these, with notes on anything that didn't happen as above.
+4. **Encounters:** travel roads together until an Extended Encounters group shows up (or clear a bandit camp). Count them: both players should see the same number, not double. Jesse talks to one (a peddler, mercenary or traveller) and should get the usual greeting/trade/hire options.
+5. **Send Josh the logs:** zip and send these, with notes on anything that didn't happen as above.
    - `Documents\My Games\Skyrim Special Edition\Logs\Script\Papyrus.0.log` (our lines start with `SCD:`)
    - `Documents\My Games\Skyrim Special Edition\SKSE\` (all `.log` files)
 
