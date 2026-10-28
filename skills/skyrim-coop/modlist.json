@@ -28,9 +28,9 @@
       "plugins": ["ExploreSkyrim-ES.esp"], "phase": 1, "note": "25+ new dungeons with placed enemies; no quests or scripts of its own." },
 
     { "name": "SkyUI", "modId": 12604, "fileId": 749043, "version": "6.11", "match": "^SkyUI-12604", "include": ["."], "plugins": ["SkyUI_SE.esp"], "phase": 2 },
-    { "name": "SSE Engine Fixes", "solo": false, "coop": false, "modId": 17230, "fileId": 725753, "version": "7.0.20", "match": "Engine Fixes - Main File",
-      "include": ["EngineFixes FOMOD Installer/Required", "EngineFixes FOMOD Installer/AE"], "phase": 2, "retired": true,
-      "note": "Off: 7.0.20 cannot read 1.7.104's Address Library (format 5) and stops the game at launch. Re-enable once an update supports 1.7" },
+    { "name": "SSE Engine Fixes", "solo": false, "modId": 17230, "fileId": 794484, "version": "7.0.21", "match": "Engine Fixes 7\\.0\\.21",
+      "include": ["EngineFixes FOMOD Installer/Required", "EngineFixes FOMOD Installer/AE"], "phase": 2,
+      "note": "7.0.21 beta, labelled 1.7.99 but reported working on 1.7.104; needs no preloader. 7.0.20 could not read 1.7.104's Address Library and stopped the game at launch." },
     { "name": "SSE Engine Fixes Preloader", "solo": false, "coop": false, "modId": 17230, "fileId": 725261, "version": "7", "match": "Engine Fixes - SKSE64 Preloader",
       "gameRoot": { "from": ".", "files": ["d3dx9_42.dll"] }, "phase": 2, "retired": true },
     { "name": "Assorted Mesh Fixes", "modId": 32117, "fileId": 812136, "version": "0.145", "match": "Assorted Mesh Fixes", "include": ["."], "phase": 2 },
