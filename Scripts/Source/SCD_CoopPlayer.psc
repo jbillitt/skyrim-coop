@@ -616,8 +616,10 @@ Function PayCredits()
 			If Now() - creditAt < CreditWait
 				Return
 			EndIf
-			; the death never showed up here; score it at our own level
-			victim = GetActorReference()
+			; one reward per corpse seen here; STR can deliver one credit several times
+			Debug.Trace("SCD: dropped " + pendingCredits + " credit(s) with no corpse")
+			pendingCredits = 0
+			Return
 		EndIf
 		pendingCredits -= 1
 		(Reward as SCD_RewardAlias).Pay(victim)

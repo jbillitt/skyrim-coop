@@ -38,6 +38,7 @@ Event OnSleepStop(Bool abInterrupted)
 	EndIf
 	; whatever the clock did pass, Survival has already credited
 	Float missing = (sleepEnd - Utility.GetCurrentGameTime()) * 24.0
+	Debug.Trace("SCD: slept " + ((Utility.GetCurrentGameTime() - sleepStart) * 24.0) + " h of " + ((sleepEnd - sleepStart) * 24.0) + ", crediting " + missing)
 	If missing <= 0.0
 		Return
 	EndIf
