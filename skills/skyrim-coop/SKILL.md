@@ -26,7 +26,7 @@ Everything here mirrors Josh's machine. The mod list and installer in this folde
 | Phase | Mods |
 |---|---|
 | 1 | SKSE 2.3.1, Address Library v13, Skyrim Together Reborn 1.8.3, Stats On Kill 1.0.2, SkyrimCoop |
-| 2 | SkyUI, SSE Engine Fixes, Assorted Mesh Fixes, Skyland AIO (optional) |
+| 2 | SkyUI, Better Third Person Selection (+ JContainers, MCM Helper), SSE Engine Fixes, Community Shaders, Assorted Mesh Fixes, Skyland AIO (optional) |
 | 3 | Cathedral Weathers, USSEP |
 
 ## Setup
