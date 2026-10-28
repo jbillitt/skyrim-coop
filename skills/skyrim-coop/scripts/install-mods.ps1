@@ -154,6 +154,11 @@ foreach ($m in $list.mods) {
         $m.enabled = $false
         continue
     }
+    # A version bump in modlist.json replaces the installed copy
+    if ((Test-Path "$dest\meta.ini") -and -not (Select-String -LiteralPath "$dest\meta.ini" -Pattern "^version=$([regex]::Escape($m.version))$" -Quiet)) {
+        Remove-Item -LiteralPath $dest -Recurse -Force
+        "Updating $($m.name) to $($m.version)"
+    }
     $stored = Join-Path $mo "downloads\$($archive.Name)"
     if (-not (Test-Path -LiteralPath $stored)) { Copy-Item -LiteralPath $archive.FullName $stored }
     # Wabbajack reads these to know each archive's Nexus source
